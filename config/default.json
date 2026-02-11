@@ -1,0 +1,52 @@
+{
+    "enabled": true,
+    "dryRun": false,
+    "proxyPort": 18790,
+    "proxyHost": "127.0.0.1",
+    "authToken": null,
+    "classification": {
+        "conservativeMode": true,
+        "minConfidence": 0.7,
+        "toolAwareRouting": true
+    },
+    "escalation": {
+        "enabled": true,
+        "maxRetries": 2,
+        "retryDelayMs": 100,
+        "onlyRetryBeforeStreaming": true,
+        "onlyRetryWithoutToolCalls": true,
+        "alwaysFallbackToOriginal": true
+    },
+    "models": {
+        "heartbeat": {
+            "primary": "google/gemini-2.5-flash-lite",
+            "fallback": "deepseek/deepseek-chat"
+        },
+        "simple": {
+            "primary": "deepseek/deepseek-chat",
+            "fallback": "google/gemini-2.5-flash"
+        },
+        "moderate": {
+            "primary": "google/gemini-2.5-flash",
+            "fallback": "openai/gpt-4o-mini"
+        },
+        "complex": {
+            "primary": "anthropic/claude-sonnet-4-5",
+            "fallback": "openai/gpt-4o"
+        },
+        "frontier": {
+            "primary": "anthropic/claude-sonnet-4-5",
+            "fallback": "openai/gpt-4o"
+        }
+    },
+    "logging": {
+        "dbPath": "./data/clawroute.db",
+        "logContent": false,
+        "logSystemPrompts": false,
+        "debugMode": false,
+        "retentionDays": 30
+    },
+    "dashboard": {
+        "enabled": true
+    }
+}

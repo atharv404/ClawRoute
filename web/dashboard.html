@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawRoute Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: rgba(22, 27, 40, 0.7);
+      --bg-tertiary: rgba(33, 38, 52, 0.6);
+      --bg-glass: rgba(16, 20, 32, 0.55);
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --accent-green: #3fb950;
+      --accent-green-dim: #238636;
+      --accent-red: #f85149;
+      --accent-blue: #58a6ff;
+      --accent-yellow: #d29922;
+      --accent-purple: #a371f7;
+      --accent-cyan: #39d2c0;
+      --border-color: rgba(48, 54, 61, 0.6);
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.55);
+      --gradient-green: linear-gradient(135deg, #3fb950, #2ea043);
+      --gradient-purple: linear-gradient(135deg, #a371f7, #8957e5);
+      --gradient-blue: linear-gradient(135deg, #58a6ff, #388bfd);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 20% 50%, rgba(63, 185, 80, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(88, 166, 255, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 50% 80%, rgba(163, 113, 247, 0.03) 0%, transparent 50%);
+      animation: bgShift 20s ease-in-out infinite alternate;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Subtle noise texture overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes bgShift {
+      0% {
+        transform: translate(0, 0) rotate(0deg);
+      }
+
+      100% {
+        transform: translate(-5%, -5%) rotate(3deg);
+      }
+    }
+
+    .container {
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* === Header === */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 36px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      opacity: 0;
+      animation: fadeSlideDown 0.6s ease forwards;
+    }
+
+    @keyframes fadeSlideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      letter-spacing: -0.3px;
+    }
+
+    h1 .logo {
+      font-size: 30px;
+      filter: drop-shadow(0 0 8px rgba(63, 185, 80, 0.3));
+    }
+
+    h1 .version {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-left: 4px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 600;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+
+    .status-badge.live {
+      background: rgba(35, 134, 54, 0.25);
+      color: var(--accent-green);
+      box-shadow: 0 0 20px rgba(63, 185, 80, 0.15);
+    }
+
+    .status-badge.dry-run {
+      background: rgba(210, 153, 34, 0.15);
+      color: var(--accent-yellow);
+    }
+
+    .status-badge.disabled {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .status-dot::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      animation: heartbeat 2s ease-in-out infinite;
+    }
+
+    .status-dot.live {
+      background: var(--accent-green);
+    }
+
+    .status-dot.live::after {
+      border: 2px solid var(--accent-green);
+    }
+
+    .status-dot.dry-run {
+      background: var(--accent-yellow);
+    }
+
+    .status-dot.dry-run::after {
+      border: 2px solid var(--accent-yellow);
+    }
+
+    .status-dot.disabled {
+      background: var(--text-muted);
+      animation: none;
+    }
+
+    .status-dot.disabled::after {
+      display: none;
+    }
+
+    @keyframes heartbeat {
+
+      0%,
+      100% {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+
+      50% {
+        opacity: 0.6;
+        transform: scale(1.6);
+      }
+    }
+
+    /* === Cards === */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.3s ease,
+        border-color 0.3s ease;
+      opacity: 0;
+      transform: translateY(20px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-hover), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .card.animate-visible {
+      animation: cardEntrance 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes cardEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.96);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .card-label {
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .info-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      transition: all 0.2s ease;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .info-icon:hover {
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+      transform: scale(1.1);
+    }
+
+    .tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: -8px;
+      background: #1c2333;
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      width: 240px;
+      line-height: 1.5;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: all 0.2s ease;
+      z-index: 100;
+    }
+
+    .tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      right: 14px;
+      border: 6px solid transparent;
+      border-top-color: #1c2333;
+    }
+
+    .info-icon:hover .tooltip {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .card-value {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 2px;
+    }
+
+    .card-value.savings {
+      background: var(--gradient-green);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .card-value.neutral {
+      color: var(--text-primary);
+    }
+
+    .card-sub {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    /* Glow effect for active savings */
+    .card.has-savings {
+      box-shadow: var(--shadow), 0 0 30px rgba(63, 185, 80, 0.08);
+    }
+
+    .card.has-savings::before {
+      opacity: 0.6;
+    }
+
+    /* === Sections === */
+    .section {
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    .section.animate-visible {
+      animation: sectionEntrance 0.6s ease forwards;
+    }
+
+    @keyframes sectionEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* === Tier Breakdown === */
+    .tier-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tier-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+
+    .tier-row.animate-visible {
+      animation: tierSlideIn 0.4s ease forwards;
+    }
+
+    @keyframes tierSlideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .tier-name {
+      width: 90px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .tier-bar {
+      flex: 1;
+      height: 28px;
+      background: rgba(33, 38, 52, 0.5);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .tier-fill {
+      height: 100%;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      padding-left: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      width: 0;
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .tier-fill.heartbeat {
+      background: linear-gradient(90deg, #3fb950, #2ea043);
+    }
+
+    .tier-fill.simple {
+      background: linear-gradient(90deg, #58a6ff, #388bfd);
+    }
+
+    .tier-fill.moderate {
+      background: linear-gradient(90deg, #a371f7, #8957e5);
+    }
+
+    .tier-fill.complex {
+      background: linear-gradient(90deg, #d29922, #b08700);
+    }
+
+    .tier-fill.frontier {
+      background: linear-gradient(90deg, #f85149, #da3633);
+    }
+
+    .tier-model {
+      width: 160px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    /* === Table === */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr {
+      transition: background 0.2s ease;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    tbody tr {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    tbody tr.animate-visible {
+      animation: rowFadeIn 0.3s ease forwards;
+    }
+
+    @keyframes rowFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .badge.heartbeat {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--accent-green);
+    }
+
+    .badge.simple {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent-blue);
+    }
+
+    .badge.moderate {
+      background: rgba(163, 113, 247, 0.15);
+      color: var(--accent-purple);
+    }
+
+    .badge.complex {
+      background: rgba(210, 153, 34, 0.15);
+      color: var(--accent-yellow);
+    }
+
+    .badge.frontier {
+      background: rgba(248, 81, 73, 0.15);
+      color: var(--accent-red);
+    }
+
+    .badge.escalated {
+      background: rgba(248, 81, 73, 0.15);
+      color: var(--accent-red);
+    }
+
+    /* === Controls === */
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-color);
+      opacity: 0;
+      animation: fadeSlideDown 0.6s ease 0.8s forwards;
+    }
+
+    button {
+      padding: 11px 22px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    button::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255, 255, 255, 0.15), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    button:active::after {
+      opacity: 1;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.primary {
+      background: var(--accent-green-dim);
+      border-color: var(--accent-green-dim);
+    }
+
+    button.primary:hover {
+      background: var(--accent-green);
+      box-shadow: 0 4px 20px rgba(63, 185, 80, 0.3);
+    }
+
+    button.danger {
+      background: rgba(248, 81, 73, 0.15);
+      border-color: rgba(248, 81, 73, 0.4);
+      color: var(--accent-red);
+    }
+
+    button.danger:hover {
+      background: var(--accent-red);
+      color: white;
+      box-shadow: 0 4px 20px rgba(248, 81, 73, 0.3);
+    }
+
+    .btn-tooltip {
+      position: relative;
+    }
+
+    .btn-tooltip .btn-tip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: #1c2333;
+      color: var(--text-primary);
+      font-size: 11px;
+      font-weight: 400;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.2s ease;
+      z-index: 100;
+    }
+
+    .btn-tooltip:hover .btn-tip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* === Donation Card === */
+    .donation-card {
+      border-color: rgba(63, 185, 80, 0.2);
+    }
+
+    .donation-card::before {
+      background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+    }
+
+    .plan-badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .plan-badge.community {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--accent-green);
+      box-shadow: 0 0 12px rgba(63, 185, 80, 0.1);
+    }
+
+    .donation-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .donation-actions button {
+      flex: 1;
+      font-size: 11px;
+      padding: 8px 12px;
+    }
+
+    /* === Payment Modal === */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--bg-primary);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 32px;
+      width: 460px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+      transform: translateY(20px) scale(0.95);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .modal-overlay.visible .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.4;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+      transform: none;
+      box-shadow: none;
+    }
+
+    .pay-option {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 14px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .pay-option:hover {
+      border-color: rgba(255, 255, 255, 0.1);
+      background: var(--bg-tertiary);
+    }
+
+    .pay-option-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .pay-option-icon {
+      font-size: 22px;
+    }
+
+    .pay-option-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .pay-option-tag {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-left: auto;
+    }
+
+    .pay-option-tag.preferred {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--accent-green);
+    }
+
+    .pay-option-tag.coming {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent-blue);
+    }
+
+    .pay-option-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .usdc-address-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .usdc-address-box code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px;
+      color: var(--accent-cyan);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .copy-btn {
+      background: var(--accent-green-dim);
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .copy-btn:hover {
+      background: var(--accent-green);
+      transform: none;
+      box-shadow: none;
+    }
+
+    .copy-btn.copied {
+      background: var(--accent-green);
+    }
+
+    .network-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent-blue);
+      margin-left: 4px;
+    }
+
+    .pay-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: none;
+      cursor: pointer;
+    }
+
+    .pay-link-btn.bmc {
+      background: #FFDD00;
+      color: #000;
+    }
+
+    .pay-link-btn.bmc:hover {
+      background: #ffeb3b;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(255, 221, 0, 0.3);
+    }
+
+    .pay-link-btn.manual {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .pay-link-btn.manual:hover {
+      background: var(--border-color);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-divider {
+      border: none;
+      border-top: 1px solid var(--border-color);
+      margin: 20px 0;
+    }
+
+    .manual-ack-section {
+      text-align: center;
+    }
+
+    .manual-ack-section p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    /* === Footer === */
+    .footer {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 20px 0 8px;
+      border-top: 1px solid var(--border-color);
+      opacity: 0;
+      animation: fadeSlideDown 0.6s ease 1s forwards;
+    }
+
+    .footer a {
+      color: var(--accent-blue);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .footer a:hover {
+      color: var(--accent-purple);
+    }
+
+    .refresh-indicator {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .refresh-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      animation: refreshPulse 30s linear infinite;
+    }
+
+    @keyframes refreshPulse {
+
+      0%,
+      97% {
+        opacity: 0.3;
+      }
+
+      98%,
+      100% {
+        opacity: 1;
+      }
+    }
+
+    /* === Responsive === */
+    @media (max-width: 768px) {
+      .container {
+        padding: 16px;
+      }
+
+      header {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+
+      .tier-model {
+        display: none;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .tooltip {
+        width: 200px;
+        right: -40px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span class="logo">🦀</span>
+        ClawRoute
+        <span class="version">v1.1</span>
+      </h1>
+      <div class="status-badge live" id="statusBadge">
+        <span class="status-dot live"></span>
+        <span id="statusText">Live</span>
+      </div>
+    </header>
+
+    <div class="cards">
+      <!-- Saved Today -->
+      <div class="card" id="cardSavings">
+        <div class="card-header">
+          <span class="card-label">Saved Today</span>
+          <div class="info-icon">ⓘ
+            <div class="tooltip">Total USD saved by routing requests to cheaper models today. Calculated as the
+              difference between original model costs and actual routed costs.</div>
+          </div>
+        </div>
+        <div class="card-value savings" id="savedToday">$0.00</div>
+        <div class="card-sub"><span id="savingsPercent">0</span>% savings rate</div>
+      </div>
+
+      <!-- Requests Today -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label">Requests Today</span>
+          <div class="info-icon">ⓘ
+            <div class="tooltip">Number of LLM requests routed through ClawRoute today. Includes all tiers from
+              heartbeat (cheapest) to frontier (most complex).</div>
+          </div>
+        </div>
+        <div class="card-value neutral" id="requestsToday">0</div>
+        <div class="card-sub"><span id="escalations">0</span> escalations</div>
+      </div>
+
+      <!-- Monthly Savings -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label">Monthly Savings</span>
+          <div class="info-icon">ⓘ
+            <div class="tooltip">Cumulative savings for the current billing month. This is used to calculate your
+              suggested Pro payment (2% of savings, min $9/mo).</div>
+          </div>
+        </div>
+        <div class="card-value savings" id="savedMonth">$0.00</div>
+        <div class="card-sub"><span id="requestsMonth">0</span> requests this month</div>
+      </div>
+
+      <!-- Plan & Billing -->
+      <div class="card billing-card">
+        <div class="card-header">
+          <span class="card-label">Plan & Billing</span>
+          <div class="info-icon">ⓘ
+            <div class="tooltip">Your current plan. Free = HEARTBEAT/SIMPLE routing only. Pro = full routing for all
+              tiers, escalation, analytics, and custom model mappings.</div>
+          </div>
+        </div>
+        <div class="card-value" id="planStatusValue">
+          <span class="plan-badge free" id="planBadge">Free</span>
+        </div>
+        <div class="card-sub" id="billingSub">Loading...</div>
+        <div id="graceWarning" class="grace-warning" style="display:none;"></div>
+        <div class="billing-actions">
+          <button id="btnPaymentModal">💳 Make Payment</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div class="modal-overlay" id="paymentModal">
+      <div class="modal" style="position: relative;">
+        <button class="modal-close" id="modalClose">✕</button>
+        <div class="modal-title">💳 Support ClawRoute Pro</div>
+        <div class="modal-subtitle">Choose a payment method. Your suggested payment is <strong
+            id="modalSuggested">$9.00/mo</strong> based on your savings.</div>
+
+        <!-- USDC Direct -->
+        <div class="pay-option" id="payUsdc" style="display:none;">
+          <div class="pay-option-header">
+            <span class="pay-option-icon">💎</span>
+            <span class="pay-option-name">USDC (Ethereum)</span>
+            <span class="pay-option-tag preferred">Preferred</span>
+          </div>
+          <div class="pay-option-desc">Send USDC directly to our wallet on <span class="network-badge">ETH
+              Mainnet</span></div>
+          <div class="usdc-address-box">
+            <code id="usdcAddr"></code>
+            <button class="copy-btn" id="btnCopyUsdc">📋 Copy</button>
+          </div>
+        </div>
+
+        <!-- Buy Me a Coffee -->
+        <div class="pay-option" id="payBmc" style="display:none;">
+          <div class="pay-option-header">
+            <span class="pay-option-icon">☕</span>
+            <span class="pay-option-name">Buy Me a Coffee</span>
+          </div>
+          <div class="pay-option-desc">Quick payment via card or PayPal</div>
+          <a class="pay-link-btn bmc" id="bmcLink" href="#" target="_blank">☕ Buy Me a Coffee</a>
+        </div>
+
+        <!-- NOWPayments -->
+        <div class="pay-option" id="payNow" style="display:none;">
+          <div class="pay-option-header">
+            <span class="pay-option-icon">🪙</span>
+            <span class="pay-option-name">Crypto (NOWPayments)</span>
+          </div>
+          <div class="pay-option-desc">Pay with BTC, ETH, SOL, or 200+ other cryptocurrencies</div>
+          <button class="pay-link-btn manual" id="btnNowPayments">🪙 Pay with Crypto</button>
+        </div>
+
+        <!-- Manual Acknowledgment -->
+        <hr class="modal-divider">
+        <div class="manual-ack-section">
+          <p>Already paid? Record it here:</p>
+          <button class="pay-link-btn manual" id="btnAckManual">✅ I've Already Paid</button>
+        </div>
+      </div>
+    </div>
+    <!-- Tier Breakdown -->
+    <div class="section" id="sectionTiers">
+      <div class="section-header">
+        <div class="section-title">
+          📊 Tier Breakdown (Today)
+        </div>
+        <div class="info-icon">ⓘ
+          <div class="tooltip">How requests are distributed by complexity tier. Each tier maps to a different model —
+            lower tiers use cheaper models, saving you money on simple tasks.</div>
+        </div>
+      </div>
+      <div class="tier-breakdown" id="tierBreakdown">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Recent Decisions -->
+    <div class="section" id="sectionRecent">
+      <div class="section-header">
+        <div class="section-title">
+          📋 Recent Routing Decisions
+        </div>
+        <div class="refresh-indicator">
+          <span class="refresh-dot"></span>
+          Auto-refresh 30s
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Tier</th>
+            <th>Routed To</th>
+            <th>Saved</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="recentDecisions">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="btn-tooltip">
+        <button class="primary" id="btnEnable">✅ Enable</button>
+        <span class="btn-tip">Enable ClawRoute routing — requests will be classified and routed to cheaper models</span>
+      </div>
+      <div class="btn-tooltip">
+        <button id="btnDryRun">🔬 Toggle Dry-Run</button>
+        <span class="btn-tip">Dry-run mode: classify and log decisions without actually rerouting. Safe for
+          testing</span>
+      </div>
+      <div class="btn-tooltip">
+        <button class="danger" id="btnDisable">⏸ Disable</button>
+        <span class="btn-tip">Disable routing — all requests pass through to the original model unchanged</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      ClawRoute v1.1 — Built with ❤️ by <a href="https://github.com/atharv404" target="_blank">atharv404</a>
+    </div>
+  </div>
+
+  <script>
+    const tiers = ['heartbeat', 'simple', 'moderate', 'complex', 'frontier'];
+
+    // === Animated Number Counter ===
+    function animateNumber(el, target, prefix = '', suffix = '', decimals = 0) {
+      const start = parseFloat(el.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+      const duration = 600;
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease out cubic
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = start + (target - start) * eased;
+        el.textContent = prefix + current.toFixed(decimals) + suffix;
+        if (progress < 1) requestAnimationFrame(update);
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    // === Intersection Observer for animations ===
+    function animateOnView() {
+      const cards = document.querySelectorAll('.card');
+      cards.forEach((card, i) => {
+        setTimeout(() => card.classList.add('animate-visible'), i * 100);
+      });
+
+      const sections = document.querySelectorAll('.section');
+      sections.forEach((section, i) => {
+        setTimeout(() => section.classList.add('animate-visible'), 400 + i * 150);
+      });
+    }
+
+    // === Ripple effect on buttons ===
+    document.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('mousedown', (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        btn.style.setProperty('--ripple-x', x + '%');
+        btn.style.setProperty('--ripple-y', y + '%');
+      });
+    });
+
+    // === Data Fetching ===
+    async function fetchStats() {
+      try {
+        const response = await fetch('/stats');
+        const data = await response.json();
+        updateDashboard(data);
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    }
+
+    function updateDashboard(data) {
+      // Status badge
+      const statusBadge = document.getElementById('statusBadge');
+      const statusDot = statusBadge.querySelector('.status-dot');
+      const statusText = document.getElementById('statusText');
+
+      statusBadge.className = 'status-badge';
+      statusDot.className = 'status-dot';
+
+      if (!data.config.enabled) {
+        statusBadge.classList.add('disabled');
+        statusDot.classList.add('disabled');
+        statusText.textContent = 'Disabled';
+      } else if (data.config.dryRun) {
+        statusBadge.classList.add('dry-run');
+        statusDot.classList.add('dry-run');
+        statusText.textContent = 'Dry-Run';
+      } else {
+        statusBadge.classList.add('live');
+        statusDot.classList.add('live');
+        statusText.textContent = 'Live';
+      }
+
+      // Cards — animated counters
+      animateNumber(document.getElementById('savedToday'), data.today.savingsUsd, '$', '', 2);
+      animateNumber(document.getElementById('savingsPercent'), data.today.savingsPercent, '', '', 1);
+      animateNumber(document.getElementById('requestsToday'), data.today.requests, '', '', 0);
+      animateNumber(document.getElementById('escalations'), data.today.escalations, '', '', 0);
+      animateNumber(document.getElementById('savedMonth'), data.thisMonth.savingsUsd, '$', '', 2);
+      animateNumber(document.getElementById('requestsMonth'), data.thisMonth.requests, '', '', 0);
+
+      // Savings glow effect
+      const savingsCard = document.getElementById('cardSavings');
+      if (data.today.savingsUsd > 0) {
+        savingsCard.classList.add('has-savings');
+      } else {
+        savingsCard.classList.remove('has-savings');
+      }
+
+      // Tier breakdown
+      const tierContainer = document.getElementById('tierBreakdown');
+      tierContainer.innerHTML = '';
+
+      const maxCount = Math.max(...tiers.map(t => data.today.tierBreakdown[t] || 0), 1);
+
+      for (let i = 0; i < tiers.length; i++) {
+        const tier = tiers[i];
+        const count = data.today.tierBreakdown[tier] || 0;
+        const pct = (count / maxCount) * 100;
+        const model = data.config.modelMap[tier] || 'unknown';
+        const shortModel = model.split('/').pop();
+
+        const row = document.createElement('div');
+        row.className = 'tier-row';
+        row.innerHTML = `
+          <span class="tier-name">${capitalize(tier)}</span>
+          <div class="tier-bar">
+            <div class="tier-fill ${tier}" id="tierFill-${tier}">
+              ${count > 0 ? count : ''}
+            </div>
+          </div>
+          <span class="tier-model">→ ${shortModel}</span>
+        `;
+        tierContainer.appendChild(row);
+
+        // Staggered animation
+        setTimeout(() => {
+          row.classList.add('animate-visible');
+          const fill = document.getElementById(`tierFill-${tier}`);
+          if (fill) {
+            fill.style.width = `${Math.max(pct, count > 0 ? 12 : 0)}%`;
+          }
+        }, i * 80);
+      }
+
+      // Recent decisions
+      const tbody = document.getElementById('recentDecisions');
+      tbody.innerHTML = '';
+
+      if (data.recentDecisions.length === 0) {
+        tbody.innerHTML = '<tr class="animate-visible"><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No routing decisions yet — start making requests!</td></tr>';
+        return;
+      }
+
+      data.recentDecisions.slice(0, 15).forEach((decision, i) => {
+        const time = new Date(decision.timestamp).toLocaleTimeString().slice(0, 5);
+        const model = decision.routedModel.split('/').pop();
+        const saved = '$' + decision.savingsUsd.toFixed(3);
+        const status = decision.escalated ? '<span class="badge escalated">↑ Escalated</span>' : '<span style="color: var(--accent-green)">✓</span>';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${time}</td>
+          <td><span class="badge ${decision.tier}">${decision.tier}</span></td>
+          <td style="font-family: 'SF Mono', monospace; font-size: 12px;">${model}</td>
+          <td style="color: var(--accent-green); font-weight: 500;">${saved}</td>
+          <td>${status}</td>
+        `;
+        tbody.appendChild(tr);
+
+        setTimeout(() => tr.classList.add('animate-visible'), i * 40);
+      });
+    }
+
+    function capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    async function apiPost(endpoint) {
+      try {
+        await fetch(endpoint, { method: 'POST' });
+        fetchStats();
+      } catch (error) {
+        console.error('API error:', error);
+      }
+    }
+
+    // Control buttons
+    document.getElementById('btnEnable').addEventListener('click', () => apiPost('/api/enable'));
+    document.getElementById('btnDisable').addEventListener('click', () => apiPost('/api/disable'));
+    document.getElementById('btnDryRun').addEventListener('click', async () => {
+      const response = await fetch('/stats');
+      const data = await response.json();
+      const endpoint = data.config.dryRun ? '/api/dry-run/disable' : '/api/dry-run/enable';
+      apiPost(endpoint);
+    });
+
+    // Donation functions
+    async function fetchDonations() {
+      try {
+        const response = await fetch('/billing/summary');
+        const data = await response.json();
+        updateDonationPanel(data);
+      } catch (error) {
+        console.error('Failed to fetch donations:', error);
+      }
+    }
+
+    function updateDonationPanel(data) {
+      const planBadge = document.getElementById('planBadge');
+      const donationSub = document.getElementById('donationSub');
+      const donationValue = document.getElementById('donationValue');
+      const card = document.querySelector('.donation-card');
+
+      if (data.savingsUsd > 0) {
+        donationValue.textContent = `$${data.savingsUsd.toFixed(2)}`;
+        donationValue.classList.add('savings');
+        donationValue.classList.remove('neutral');
+        donationSub.textContent = `saved this month`;
+        card.classList.add('has-savings');
+      } else {
+        donationValue.textContent = '$0.00';
+        donationValue.classList.remove('savings');
+        donationValue.classList.add('neutral');
+        donationSub.textContent = 'savings this month';
+        card.classList.remove('has-savings');
+      }
+
+      // Always Community
+      planBadge.className = 'plan-badge community';
+      planBadge.textContent = 'Community';
+
+      // Update payment modal default
+      const amountInput = document.getElementById('amountInput');
+      if (amountInput && data.suggestedUsd) {
+        amountInput.value = Math.max(data.suggestedUsd, 9).toFixed(2);
+      }
+    }
+
+    // === Payment Modal ===
+    const paymentModal = document.getElementById('paymentModal');
+    const modalClose = document.getElementById('modalClose');
+
+    document.getElementById('btnPaymentModal').addEventListener('click', () => {
+      paymentModal.classList.add('visible');
+      loadPaymentLinks();
+    });
+
+    modalClose.addEventListener('click', () => {
+      paymentModal.classList.remove('visible');
+    });
+
+    paymentModal.addEventListener('click', (e) => {
+      if (e.target === paymentModal) paymentModal.classList.remove('visible');
+    });
+
+    // Load payment links from API
+    async function loadPaymentLinks() {
+      try {
+        const [linksRes, billingRes] = await Promise.all([
+          fetch('/billing/paylinks'),
+          fetch('/billing/summary')
+        ]);
+        const links = await linksRes.json();
+        const billing = await billingRes.json();
+
+        // Update suggested amount
+        document.getElementById('modalSuggested').textContent = `$${billing.suggestedUsd?.toFixed(2) ?? '9.00'}/mo`;
+
+        // USDC
+        if (links.usdcAddress) {
+          document.getElementById('payUsdc').style.display = 'block';
+          document.getElementById('usdcAddr').textContent = links.usdcAddress;
+        }
+
+        // Buy Me a Coffee
+        if (links.buyMeCoffeeUrl) {
+          document.getElementById('payBmc').style.display = 'block';
+          document.getElementById('bmcLink').href = links.buyMeCoffeeUrl;
+        }
+
+        // NOWPayments
+        if (links.nowPaymentsEnabled) {
+          document.getElementById('payNow').style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Failed to load payment links:', error);
+      }
+    }
+
+    // Copy USDC address
+    document.getElementById('btnCopyUsdc').addEventListener('click', async () => {
+      const addr = document.getElementById('usdcAddr').textContent;
+      const btn = document.getElementById('btnCopyUsdc');
+      try {
+        await navigator.clipboard.writeText(addr);
+        btn.textContent = '✅ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = '📋 Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = addr;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+      }
+    });
+
+    // Manual acknowledgment
+    document.getElementById('btnAckManual').addEventListener('click', async () => {
+      const amount = prompt('Enter payment amount (USD):', '9');
+      if (!amount) return;
+      const method = prompt('Payment method used (usdc/bmc/other):', 'usdc');
+      if (!method) return;
+
+      try {
+        await fetch('/billing/acknowledge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amountUsd: parseFloat(amount),
+            method: method,
+            note: 'Acknowledged via dashboard'
+          })
+        });
+        alert('✅ Payment acknowledged! Thank you for supporting ClawRoute.');
+        paymentModal.classList.remove('visible');
+        fetchDonations();
+      } catch (error) {
+        alert('Failed to acknowledge payment');
+      }
+    });
+
+    // NOWPayments button
+    document.getElementById('btnNowPayments')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnNowPayments');
+      const origText = btn.textContent;
+      btn.textContent = '⏳ Creating invoice...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/billing/nowpayments/invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const data = await res.json();
+
+        if (data.invoiceUrl) {
+          window.open(data.invoiceUrl, '_blank');
+          btn.textContent = '✅ Invoice opened!';
+          setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 3000);
+        } else {
+          btn.textContent = '❌ Failed';
+          setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+        }
+      } catch {
+        btn.textContent = '❌ Error';
+        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+      }
+    });
+
+    // Initial load
+    animateOnView();
+    fetchStats();
+    fetchDonations();
+    setInterval(fetchStats, 30000);
+    setInterval(fetchDonations, 60000);
+    // === Three.js Background ===
+    function initThreeJs() {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.domElement.style.position = 'fixed';
+      renderer.domElement.style.top = '0';
+      renderer.domElement.style.left = '0';
+      renderer.domElement.style.zIndex = '-1';
+      renderer.domElement.style.opacity = '0.4';
+      document.body.appendChild(renderer.domElement);
+
+      // Create particles
+      const particlesGeometry = new THREE.BufferGeometry();
+      const particlesCount = 150;
+      const posArray = new Float32Array(particlesCount * 3);
+
+      for (let i = 0; i < particlesCount * 3; i++) {
+        posArray[i] = (Math.random() - 0.5) * 20;
+      }
+
+      particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+      // Material
+      const material = new THREE.PointsMaterial({
+        size: 0.03,
+        color: 0x3fb950,
+        transparent: true,
+        opacity: 0.8
+      });
+
+      // Mesh
+      const particlesMesh = new THREE.Points(particlesGeometry, material);
+      scene.add(particlesMesh);
+
+      // Lines
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0x58a6ff,
+        transparent: true,
+        opacity: 0.15
+      });
+
+      const linesGeometry = new THREE.BufferGeometry();
+      const linesMesh = new THREE.LineSegments(linesGeometry, lineMaterial);
+      scene.add(linesMesh);
+
+      camera.position.z = 5;
+
+      // Mouse interaction
+      let mouseX = 0;
+      let mouseY = 0;
+
+      document.addEventListener('mousemove', (event) => {
+        mouseX = event.clientX / window.innerWidth - 0.5;
+        mouseY = event.clientY / window.innerHeight - 0.5;
+      });
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        particlesMesh.rotation.y += 0.001;
+        particlesMesh.rotation.x += 0.0005;
+
+        // Gentle float
+        particlesMesh.position.x = mouseX * 0.5;
+        particlesMesh.position.y = -mouseY * 0.5;
+
+        // Connect particles
+        const positions = particlesMesh.geometry.attributes.position.array;
+        const linePositions = [];
+
+        // Dynamic connections based on distance (simplified for performance)
+        // We'll just rotate the mesh for the visual effect in this lightweight version
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      // Handle resize
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    // Start Three.js
+    initThreeJs();
+  </script>
+</body>
+
+</html>
