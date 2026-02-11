@@ -15,9 +15,15 @@ import {
     ClawRouteConfig,
     LogEntry,
     RecentDecision,
-    PaymentAck,
     TaskTier,
 } from './types.js';
+
+interface PaymentAck {
+    timestamp: string;
+    amountUsd: number;
+    method: 'stripe' | 'usdc' | 'manual';
+    note?: string;
+}
 
 // === Singleton State ===
 

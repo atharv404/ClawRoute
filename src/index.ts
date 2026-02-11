@@ -10,7 +10,7 @@ import { loadConfig } from './config.js';
 import { logAuthWarning } from './auth.js';
 import { initDb, pruneOldEntries, closeDb } from './logger.js';
 import { createApp } from './server.js';
-import { isProEnabled } from './router.js';
+// import { isProEnabled } from './router.js'; // Removed in v1.1
 import { getStartupSummary } from './stats.js';
 import { TaskTier } from './types.js';
 
@@ -20,9 +20,7 @@ import { TaskTier } from './types.js';
 function printBanner(config: ReturnType<typeof loadConfig>): void {
     const mode = config.dryRun ? 'DRY-RUN' : 'LIVE';
     const auth = config.authToken ? 'token required' : 'open (localhost only)';
-    const planLabel = config.license.enabled ? '🔓 Pro'
-        : isProEnabled(config) ? '⏳ Trial'
-            : '🆓 Free';
+    const planLabel = '❤️  Donationware';
 
     console.log(`
 ╔═══════════════════════════════════════════════════════╗
