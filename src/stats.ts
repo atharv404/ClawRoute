@@ -4,7 +4,7 @@
  * Queries for computing statistics from the routing log.
  */
 
-import { PeriodStats, StatsResponse, TaskTier, ClawRouteConfig, DonationSummary } from './types.js';
+import { PeriodStats, StatsResponse, TaskTier, ClawRouteConfig } from './types.js';
 import { getDb, getRecentDecisions } from './logger.js';
 import { getModelMap } from './router.js';
 import { Database } from 'sql.js';
@@ -205,15 +205,17 @@ export function getStartupSummary(config: ClawRouteConfig): string {
     return `Total savings: $${stats.allTime.savingsUsd.toFixed(2)} across ${stats.allTime.requests} requests (${stats.allTime.savingsPercent.toFixed(1)}% savings rate)`;
 }
 
-// === Donation Summary (v1.1) ===
+// === Billing Summary (v1.1) ===
+
+import { BillingSummary } from './types.js';
 
 /**
- * Get donation summary for the current month.
+ * Get billing summary for the current month.
  *
  * @param config - The ClawRoute configuration
- * @returns DonationSummary
+ * @returns BillingSummary
  */
-export function getDonationSummary(config: ClawRouteConfig): DonationSummary {
+export function getBillingSummary(config: ClawRouteConfig): BillingSummary {
     const db = getDb();
 
     // Get current month boundaries
@@ -221,15 +223,25 @@ export function getDonationSummary(config: ClawRouteConfig): DonationSummary {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
+    // Determine if grace is active
+    const graceActive = !config.license.enabled &&
+        config.license.graceUntil !== undefined &&
+        new Date(config.license.graceUntil) > now;
+
     // Default empty summary
-    const emptySummary: DonationSummary = {
+    const emptySummary: BillingSummary = {
         monthStart: monthStart.toISOString(),
         monthEnd: monthEnd.toISOString(),
         savingsUsd: 0,
         originalCostUsd: 0,
         actualCostUsd: 0,
         percentSavings: 0,
-        suggestedUsd: config.donations.minMonthlyUsd,
+        proRatePercent: config.billing.proRatePercent,
+        minMonthlyUsd: config.billing.minMonthlyUsd,
+        suggestedUsd: config.billing.minMonthlyUsd,
+        plan: config.license.plan,
+        graceActive,
+        graceUntil: config.license.graceUntil ?? undefined,
         requests: 0,
     };
 
@@ -262,6 +274,10 @@ export function getDonationSummary(config: ClawRouteConfig): DonationSummary {
                 ? (savingsUsd / originalCostUsd) * 100
                 : 0;
 
+            // Calculate suggested payment: 2% of savings, min $9
+            const calculatedPayment = savingsUsd * config.billing.proRatePercent;
+            const suggestedUsd = Math.max(config.billing.minMonthlyUsd, calculatedPayment);
+
             return {
                 monthStart: monthStart.toISOString(),
                 monthEnd: monthEnd.toISOString(),
@@ -269,7 +285,12 @@ export function getDonationSummary(config: ClawRouteConfig): DonationSummary {
                 originalCostUsd,
                 actualCostUsd,
                 percentSavings,
-                suggestedUsd: config.donations.minMonthlyUsd,
+                proRatePercent: config.billing.proRatePercent,
+                minMonthlyUsd: config.billing.minMonthlyUsd,
+                suggestedUsd,
+                plan: config.license.plan,
+                graceActive,
+                graceUntil: config.license.graceUntil ?? undefined,
                 requests,
             };
         }

@@ -21,7 +21,6 @@ import {
     AlertsConfig,
 } from './types.js';
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -181,15 +180,13 @@ const DEFAULT_CONFIG: Omit<ClawRouteConfig, 'apiKeys' | 'overrides'> = {
 
     // v1.1: Donation defaults
     donations: {
-        minMonthlyUsd: 9, // Suggested donation amount
+        minMonthlyUsd: 9,
         enabled: true,
     },
 
     // v1.1: Alerts defaults (disabled)
     alerts: {},
 };
-
-
 
 /**
  * Load donation config from environment.

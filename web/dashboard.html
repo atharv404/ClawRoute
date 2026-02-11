@@ -8,7 +8,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     :root {
       --bg-primary: #0a0e17;
@@ -718,13 +717,13 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    /* === Donation Card === */
-    .donation-card {
-      border-color: rgba(63, 185, 80, 0.2);
+    /* === Billing Card === */
+    .billing-card {
+      border-color: rgba(163, 113, 247, 0.2);
     }
 
-    .donation-card::before {
-      background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+    .billing-card::before {
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
     }
 
     .plan-badge {
@@ -737,19 +736,35 @@
       letter-spacing: 0.5px;
     }
 
-    .plan-badge.community {
-      background: rgba(63, 185, 80, 0.15);
-      color: var(--accent-green);
-      box-shadow: 0 0 12px rgba(63, 185, 80, 0.1);
+    .plan-badge.pro {
+      background: rgba(163, 113, 247, 0.2);
+      color: var(--accent-purple);
+      box-shadow: 0 0 12px rgba(163, 113, 247, 0.1);
     }
 
-    .donation-actions {
+    .plan-badge.free {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+    }
+
+    .grace-warning {
+      background: rgba(210, 153, 34, 0.08);
+      border: 1px solid rgba(210, 153, 34, 0.3);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--accent-yellow);
+      margin-top: 12px;
+      line-height: 1.4;
+    }
+
+    .billing-actions {
       display: flex;
       gap: 8px;
       margin-top: 12px;
     }
 
-    .donation-actions button {
+    .billing-actions button {
       flex: 1;
       font-size: 11px;
       padding: 8px 12px;
@@ -1448,45 +1463,39 @@
       apiPost(endpoint);
     });
 
-    // Donation functions
-    async function fetchDonations() {
+    // Billing functions
+    async function fetchBilling() {
       try {
         const response = await fetch('/billing/summary');
         const data = await response.json();
-        updateDonationPanel(data);
+        updateBillingPanel(data);
       } catch (error) {
-        console.error('Failed to fetch donations:', error);
+        console.error('Failed to fetch billing:', error);
       }
     }
 
-    function updateDonationPanel(data) {
+    function updateBillingPanel(data) {
       const planBadge = document.getElementById('planBadge');
-      const donationSub = document.getElementById('donationSub');
-      const donationValue = document.getElementById('donationValue');
-      const card = document.querySelector('.donation-card');
+      const billingSub = document.getElementById('billingSub');
+      const graceWarning = document.getElementById('graceWarning');
 
-      if (data.savingsUsd > 0) {
-        donationValue.textContent = `$${data.savingsUsd.toFixed(2)}`;
-        donationValue.classList.add('savings');
-        donationValue.classList.remove('neutral');
-        donationSub.textContent = `saved this month`;
-        card.classList.add('has-savings');
+      planBadge.className = 'plan-badge ' + data.plan;
+      planBadge.textContent = data.plan === 'pro' ? 'Pro' : 'Free';
+
+      if (data.plan === 'pro' || data.graceActive) {
+        billingSub.textContent = `Suggested: $${data.suggestedUsd.toFixed(2)}/mo (${(data.proRatePercent * 100).toFixed(0)}% of savings)`;
       } else {
-        donationValue.textContent = '$0.00';
-        donationValue.classList.remove('savings');
-        donationValue.classList.add('neutral');
-        donationSub.textContent = 'savings this month';
-        card.classList.remove('has-savings');
+        billingSub.textContent = 'Limited routing on Free plan';
       }
 
-      // Always Community
-      planBadge.className = 'plan-badge community';
-      planBadge.textContent = 'Community';
-
-      // Update payment modal default
-      const amountInput = document.getElementById('amountInput');
-      if (amountInput && data.suggestedUsd) {
-        amountInput.value = Math.max(data.suggestedUsd, 9).toFixed(2);
+      if (data.graceActive && data.graceUntil) {
+        const graceEnd = new Date(data.graceUntil).toLocaleDateString();
+        graceWarning.innerHTML = `⏳ Trial period active until ${graceEnd}. All Pro features enabled.`;
+        graceWarning.style.display = 'block';
+        planBadge.className = 'plan-badge pro';
+        planBadge.textContent = 'Trial';
+      } else {
+        graceWarning.style.display = 'none';
       }
     }
 
@@ -1585,7 +1594,7 @@
         });
         alert('✅ Payment acknowledged! Thank you for supporting ClawRoute.');
         paymentModal.classList.remove('visible');
-        fetchDonations();
+        fetchBilling();
       } catch (error) {
         alert('Failed to acknowledge payment');
       }
@@ -1623,100 +1632,9 @@
     // Initial load
     animateOnView();
     fetchStats();
-    fetchDonations();
+    fetchBilling();
     setInterval(fetchStats, 30000);
-    setInterval(fetchDonations, 60000);
-    // === Three.js Background ===
-    function initThreeJs() {
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.domElement.style.position = 'fixed';
-      renderer.domElement.style.top = '0';
-      renderer.domElement.style.left = '0';
-      renderer.domElement.style.zIndex = '-1';
-      renderer.domElement.style.opacity = '0.4';
-      document.body.appendChild(renderer.domElement);
-
-      // Create particles
-      const particlesGeometry = new THREE.BufferGeometry();
-      const particlesCount = 150;
-      const posArray = new Float32Array(particlesCount * 3);
-
-      for (let i = 0; i < particlesCount * 3; i++) {
-        posArray[i] = (Math.random() - 0.5) * 20;
-      }
-
-      particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-
-      // Material
-      const material = new THREE.PointsMaterial({
-        size: 0.03,
-        color: 0x3fb950,
-        transparent: true,
-        opacity: 0.8
-      });
-
-      // Mesh
-      const particlesMesh = new THREE.Points(particlesGeometry, material);
-      scene.add(particlesMesh);
-
-      // Lines
-      const lineMaterial = new THREE.LineBasicMaterial({
-        color: 0x58a6ff,
-        transparent: true,
-        opacity: 0.15
-      });
-
-      const linesGeometry = new THREE.BufferGeometry();
-      const linesMesh = new THREE.LineSegments(linesGeometry, lineMaterial);
-      scene.add(linesMesh);
-
-      camera.position.z = 5;
-
-      // Mouse interaction
-      let mouseX = 0;
-      let mouseY = 0;
-
-      document.addEventListener('mousemove', (event) => {
-        mouseX = event.clientX / window.innerWidth - 0.5;
-        mouseY = event.clientY / window.innerHeight - 0.5;
-      });
-
-      function animate() {
-        requestAnimationFrame(animate);
-
-        particlesMesh.rotation.y += 0.001;
-        particlesMesh.rotation.x += 0.0005;
-
-        // Gentle float
-        particlesMesh.position.x = mouseX * 0.5;
-        particlesMesh.position.y = -mouseY * 0.5;
-
-        // Connect particles
-        const positions = particlesMesh.geometry.attributes.position.array;
-        const linePositions = [];
-
-        // Dynamic connections based on distance (simplified for performance)
-        // We'll just rotate the mesh for the visual effect in this lightweight version
-
-        renderer.render(scene, camera);
-      }
-
-      animate();
-
-      // Handle resize
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-    }
-
-    // Start Three.js
-    initThreeJs();
+    setInterval(fetchBilling, 60000);
   </script>
 </body>
 

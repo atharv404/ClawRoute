@@ -15,6 +15,7 @@ import {
     ClawRouteConfig,
     LogEntry,
     RecentDecision,
+    PaymentAck,
     TaskTier,
 } from './types.js';
 
@@ -78,7 +79,15 @@ export async function initDb(config: ClawRouteConfig): Promise<void> {
         )
     `);
 
-
+    db.run(`
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            amount_usd REAL NOT NULL,
+            method TEXT NOT NULL,
+            note TEXT
+        )
+    `);
 
     // Create indexes for common queries
     db.run(`
@@ -253,7 +262,67 @@ export function pruneOldEntries(retentionDays: number): number {
     }
 }
 
+// === Payments (v1.1) ===
 
+/**
+ * Record a payment acknowledgment.
+ *
+ * @param amountUsd - Amount paid in USD
+ * @param method - Payment method ('stripe' | 'usdc' | 'manual')
+ * @param note - Optional note
+ */
+export function recordPayment(
+    amountUsd: number,
+    method: 'stripe' | 'usdc' | 'manual',
+    note?: string
+): void {
+    if (!db) return;
+
+    try {
+        db.run(
+            `INSERT INTO payments (timestamp, amount_usd, method, note)
+             VALUES (?, ?, ?, ?)`,
+            [new Date().toISOString(), amountUsd, method, note ?? null]
+        );
+        persistDb();
+    } catch (error) {
+        console.warn('Failed to record payment:', error);
+    }
+}
+
+/**
+ * Get all payment records.
+ *
+ * @returns Array of payment acknowledgments
+ */
+export function getPayments(): PaymentAck[] {
+    if (!db) return [];
+
+    try {
+        const stmt = db.prepare(
+            `SELECT timestamp, amount_usd, method, note
+             FROM payments
+             ORDER BY id DESC`
+        );
+
+        const payments: PaymentAck[] = [];
+        while (stmt.step()) {
+            const row = stmt.getAsObject() as Record<string, unknown>;
+            payments.push({
+                timestamp: row['timestamp'] as string,
+                amountUsd: row['amount_usd'] as number,
+                method: row['method'] as 'stripe' | 'usdc' | 'manual',
+                note: row['note'] as string | undefined,
+            });
+        }
+        stmt.free();
+
+        return payments;
+    } catch (error) {
+        console.warn('Failed to get payments:', error);
+        return [];
+    }
+}
 
 // === Shutdown ===
 

@@ -18,7 +18,7 @@ import {
 } from './types.js';
 import { getApiBaseUrl, getAuthHeader, calculateCost, getProviderForModel } from './models.js';
 import { getApiKey } from './config.js';
-import { getEscalatedModel, isProEnabled } from './router.js';
+import { getEscalatedModel } from './router.js';
 import { validateResponse } from './validator.js';
 import { pipeStream, getSSEHeaders, StreamResult } from './streaming.js';
 import { sleep, estimateMessagesTokens, safeJsonParse } from './utils.js';
@@ -31,15 +31,9 @@ import { sleep, estimateMessagesTokens, safeJsonParse } from './utils.js';
  * @param config - The config
  * @returns True if escalation is allowed
  */
-function canEscalate(currentTier: TaskTier, config: ClawRouteConfig): boolean {
-    // Pro can always escalate (subject to other rules)
-    if (isProEnabled(config)) {
-        return true;
-    }
-
-    // Free plan: Only allow escalation from HEARTBEAT to SIMPLE
-    // SIMPLE and beyond cannot escalate on Free
-    return currentTier === TaskTier.HEARTBEAT;
+function canEscalate(_currentTier: TaskTier, _config: ClawRouteConfig): boolean {
+    // Community Edition: Escalation always allowed (logic handled by config settings)
+    return true;
 }
 
 /**

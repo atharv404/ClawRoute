@@ -84,7 +84,7 @@ clawroute billing
 | `CLAWROUTE_TOKEN` | - | Auth token (optional) |
 | `CLAWROUTE_DRY_RUN` | `false` | Classify but don't reroute |
 | `CLAWROUTE_DEBUG` | `false` | Verbose logging |
-| `CLAWROUTE_LICENSE` | - | Pro license token |
+
 | `CLAWROUTE_PRO_RATE` | `0.02` | Suggested payment rate (% of savings) |
 | `CLAWROUTE_PRO_MIN_MONTHLY` | `9` | Minimum monthly payment (USD) |
 

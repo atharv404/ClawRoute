@@ -16,10 +16,11 @@ import {
 } from './types.js';
 import { createAuthMiddleware } from './auth.js';
 import { classifyRequest, explainClassification } from './classifier.js';
-import { routeRequest } from './router.js';
+import { routeRequest, isProEnabled } from './router.js';
 import { executeRequest, executePassthrough } from './executor.js';
-import { getStatsResponse, getDonationSummary } from './stats.js';
-import { getRedactedConfig } from './config.js';
+import { logRouting, recordPayment } from './logger.js';
+import { getStatsResponse, getBillingSummary } from './stats.js';
+import { getRedactedConfig, saveLicenseToFile } from './config.js';
 import { generateRequestId, nowIso } from './utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -292,11 +293,11 @@ export function createApp(config: ClawRouteConfig): Hono {
         );
     });
 
-    // === Donation Endpoints (v1.1) ===
+    // === Billing Endpoints (v1.1) ===
 
-    // Get donation summary
+    // Get billing summary
     app.get('/billing/summary', (c) => {
-        const summary = getDonationSummary(config);
+        const summary = getBillingSummary(config);
         return c.json(summary);
     });
 
@@ -313,8 +314,17 @@ export function createApp(config: ClawRouteConfig): Hono {
                 return c.json({ error: 'Provide amountUsd and method' }, 400);
             }
 
+            // Record payment in database
+            recordPayment(body.amountUsd, body.method, body.note);
+
+            // Update last acknowledge timestamp in license
+            config.license.lastAcknowledge = nowIso();
+            saveLicenseToFile(config.license);
+
+            console.log(`💰 Payment acknowledged: $${body.amountUsd} via ${body.method}`);
+
             // Return updated billing summary
-            const summary = getDonationSummary(config);
+            const summary = getBillingSummary(config);
             return c.json({ success: true, ...summary });
         } catch {
             return c.json({ error: 'Invalid JSON body' }, 400);
@@ -324,34 +334,34 @@ export function createApp(config: ClawRouteConfig): Hono {
     // Get payment links
     app.get('/billing/paylinks', (c) => {
         return c.json({
-            stripeUrl: config.donations.stripeCheckoutUrl ?? null,
-            usdcAddress: config.donations.usdcAddress ?? null,
-            buyMeCoffeeUrl: config.donations.buyMeCoffeeUrl ?? null,
-            nowPaymentsEnabled: !!config.donations.nowPaymentsApiKey,
+            stripeUrl: config.billing.stripeCheckoutUrl ?? null,
+            usdcAddress: config.billing.usdcAddress ?? null,
+            buyMeCoffeeUrl: config.billing.buyMeCoffeeUrl ?? null,
+            nowPaymentsEnabled: !!config.billing.nowPaymentsApiKey,
         });
     });
 
     // Create NOWPayments invoice
     app.post('/billing/nowpayments/invoice', async (c) => {
-        if (!config.donations.nowPaymentsApiKey) {
+        if (!config.billing.nowPaymentsApiKey) {
             return c.json({ error: 'NOWPayments not configured' }, 400);
         }
 
         try {
             const body = await c.req.json() as { amountUsd?: number };
-            const amount = body.amountUsd ?? config.donations.minMonthlyUsd;
+            const amount = body.amountUsd ?? config.billing.minMonthlyUsd;
 
             const response = await fetch('https://api.nowpayments.io/v1/invoice', {
                 method: 'POST',
                 headers: {
-                    'x-api-key': config.donations.nowPaymentsApiKey,
+                    'x-api-key': config.billing.nowPaymentsApiKey,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     price_amount: amount,
                     price_currency: 'usd',
                     order_id: `clawroute-${Date.now()}`,
-                    order_description: `ClawRoute Donation - $${amount}`,
+                    order_description: `ClawRoute Pro - $${amount}/mo`,
                     success_url: `http://${config.proxyHost}:${config.proxyPort}/dashboard?payment=success`,
                     cancel_url: `http://${config.proxyHost}:${config.proxyPort}/dashboard?payment=cancelled`,
                 }),
@@ -370,6 +380,73 @@ export function createApp(config: ClawRouteConfig): Hono {
             console.error('NOWPayments error:', error);
             return c.json({ error: 'Failed to create invoice' }, 500);
         }
+    });
+
+    // === License Endpoints (v1.1) ===
+
+    // Enable license
+    app.post('/license/enable', async (c) => {
+        try {
+            const body = await c.req.json() as { token?: string };
+
+            if (!body.token) {
+                return c.json({ error: 'Provide token' }, 400);
+            }
+
+            // Update license state (honorware - no remote validation)
+            config.license = {
+                enabled: true,
+                plan: 'pro',
+                token: body.token,
+                lastAcknowledge: config.license.lastAcknowledge,
+            };
+
+            // Persist to file
+            saveLicenseToFile(config.license);
+
+            console.log('🔓 Pro license enabled');
+            return c.json({
+                success: true,
+                plan: 'pro',
+                enabled: true,
+            });
+        } catch {
+            return c.json({ error: 'Invalid JSON body' }, 400);
+        }
+    });
+
+    // Disable license
+    app.post('/license/disable', (c) => {
+        const graceDays = config.billing.graceDays;
+        const graceUntil = new Date(
+            Date.now() + graceDays * 24 * 60 * 60 * 1000
+        ).toISOString();
+
+        config.license = {
+            enabled: false,
+            plan: 'free',
+            graceUntil,
+        };
+
+        saveLicenseToFile(config.license);
+
+        console.log('🔒 License disabled, grace period started');
+        return c.json({
+            success: true,
+            plan: 'free',
+            enabled: false,
+            graceUntil,
+        });
+    });
+
+    // Get license status
+    app.get('/license/status', (c) => {
+        return c.json({
+            enabled: config.license.enabled,
+            plan: config.license.plan,
+            graceUntil: config.license.graceUntil ?? null,
+            graceActive: isProEnabled(config) && !config.license.enabled,
+        });
     });
 
     // Catch-all for unknown routes

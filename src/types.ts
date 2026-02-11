@@ -490,12 +490,25 @@ export interface ValidationResult {
     hadToolCalls: boolean;
 }
 
-// === Plan & Billing (v1.1) ===
+// === Donation & Community Support (v1.1) ===
 
 /**
- * Plan types for ClawRoute.
+ * Donation configuration.
  */
-
+export interface DonationConfig {
+    /** Suggested monthly donation in USD (default 9) */
+    minMonthlyUsd: number;
+    /** Optional Stripe checkout URL */
+    stripeCheckoutUrl?: string;
+    /** Optional USDC payment address */
+    usdcAddress?: string;
+    /** Optional Buy Me a Coffee URL */
+    buyMeCoffeeUrl?: string;
+    /** Optional NOWPayments API key */
+    nowPaymentsApiKey?: string;
+    /** Whether donations are enabled */
+    enabled: boolean;
+}
 
 /**
  * Monthly donation summary.
@@ -517,23 +530,6 @@ export interface DonationSummary {
     suggestedUsd: number;
     /** Total requests this month */
     requests: number;
-}
-/**
- * Donation configuration.
- */
-export interface DonationConfig {
-    /** Suggested monthly donation in USD (default 9) */
-    minMonthlyUsd: number;
-    /** Optional Stripe checkout URL */
-    stripeCheckoutUrl?: string;
-    /** Optional USDC payment address */
-    usdcAddress?: string;
-    /** Optional Buy Me a Coffee URL */
-    buyMeCoffeeUrl?: string;
-    /** Optional NOWPayments API key */
-    nowPaymentsApiKey?: string;
-    /** Whether donations are enabled */
-    enabled: boolean;
 }
 
 /**

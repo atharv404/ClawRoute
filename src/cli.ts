@@ -62,21 +62,17 @@ Commands:
   live               Disable dry-run mode (go live)
   log                Show last 20 routing decisions
   config             Show current configuration
-  billing            Show billing summary and suggested payment
-  license            Show license status
-  license --enable   Enable Pro license (with token)
-  license --disable  Disable Pro license
+  billing            Show donation info and savings
   help               Show this help message
 
 Examples:
   clawroute start           # Start the proxy server
   clawroute stats           # Show today's stats
-  clawroute billing         # Show billing info
-  clawroute license         # Show license status
+  clawroute billing         # Show donation info
 
 Environment:
   CLAWROUTE_HOST     Target host for CLI commands (default: ${DEFAULT_HOST})
-  CLAWROUTE_LICENSE  Pro license token (honorware)
+
 `);
 }
 
@@ -309,7 +305,7 @@ async function main(): Promise<void> {
             break;
 
         case 'license':
-            await handleLicense(args);
+            console.error('Command deprecated. ClawRoute is now donationware.');
             break;
 
         default:
@@ -321,78 +317,27 @@ async function main(): Promise<void> {
     }
 }
 
-// === v1.1 Billing & License Commands ===
-
-interface BillingSummary {
+interface DonationSummary {
     monthStart: string;
     monthEnd: string;
     savingsUsd: number;
     originalCostUsd: number;
     actualCostUsd: number;
     percentSavings: number;
-    proRatePercent: number;
-    minMonthlyUsd: number;
     suggestedUsd: number;
-    plan: string;
-    graceActive: boolean;
     requests: number;
 }
 
-interface LicenseStatus {
-    enabled: boolean;
-    plan: string;
-    graceUntil: string | null;
-    graceActive: boolean;
-}
-
 async function showBilling(): Promise<void> {
-    const data = await request('/billing/summary') as BillingSummary;
+    const data = await request('/billing/summary') as DonationSummary;
 
-    console.log('\n💰 ClawRoute Billing Summary\n');
-    console.log(`  Plan:                ${data.plan.toUpperCase()}${data.graceActive ? ' (Trial)' : ''}`);
+    console.log('\n💰 ClawRoute Donation Summary\n');
     console.log(`  This Month Savings:  $${data.savingsUsd.toFixed(2)}`);
     console.log(`  This Month Requests: ${data.requests}`);
     console.log(`  Savings Rate:        ${data.percentSavings.toFixed(1)}%`);
     console.log('');
-    console.log(`  Pro Rate:            ${(data.proRatePercent * 100).toFixed(0)}% of savings`);
-    console.log(`  Minimum Monthly:     $${data.minMonthlyUsd.toFixed(2)}`);
-    console.log(`  Suggested Payment:   $${data.suggestedUsd.toFixed(2)}`);
-    console.log('');
-
-    if (data.graceActive) {
-        console.log('  ⏳ Trial period active. Pro features enabled.');
-    } else if (data.plan === 'free') {
-        console.log('  💡 Upgrade to Pro for full routing capabilities.');
-    }
-}
-
-async function handleLicense(args: string[]): Promise<void> {
-    const option = args[0];
-
-    if (option === '--enable') {
-        const token = args[1] || process.env['CLAWROUTE_LICENSE'] || 'pro-token';
-        await request('/license/enable', 'POST', { token });
-        console.log('✅ Pro license enabled');
-        return;
-    }
-
-    if (option === '--disable') {
-        await request('/license/disable', 'POST');
-        console.log('✅ License disabled, grace period started');
-        return;
-    }
-
-    // Default: show status
-    const data = await request('/license/status') as LicenseStatus;
-
-    console.log('\n🔑 ClawRoute License Status\n');
-    console.log(`  Plan:         ${data.plan.toUpperCase()}`);
-    console.log(`  Enabled:      ${data.enabled ? 'Yes' : 'No'}`);
-    console.log(`  Grace Active: ${data.graceActive ? 'Yes' : 'No'}`);
-
-    if (data.graceUntil) {
-        console.log(`  Grace Until:  ${new Date(data.graceUntil).toLocaleDateString()}`);
-    }
+    console.log(`  Suggested Donation:  $${data.suggestedUsd.toFixed(2)}`);
+    console.log('  Support the project to keep it sustainable!');
     console.log('');
 }
 

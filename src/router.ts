@@ -9,71 +9,7 @@ import { hasApiKey } from './config.js';
 import { calculateCost, getProviderForModel } from './models.js';
 import { estimateMessagesTokens } from './utils.js';
 
-// === Plan Feature Gating (v1.1) ===
 
-/**
- * Check if Pro features are enabled.
- * Pro is enabled if license is active OR within grace period.
- *
- * @param config - The ClawRoute configuration
- * @returns True if Pro features should be available
- */
-export function isProEnabled(config: ClawRouteConfig): boolean {
-    // Explicit Pro license
-    if (config.license.enabled) {
-        return true;
-    }
-
-    // Within grace period
-    if (config.license.graceUntil) {
-        const graceEnd = new Date(config.license.graceUntil);
-        if (graceEnd > new Date()) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/**
- * Check if MODERATE tier should use restricted routing (Free plan).
- * On Free: MODERATE routes to mid-tier only if no tools detected.
- *
- * @param tier - The task tier
- * @param toolsDetected - Whether tools were detected in request
- * @param config - The config
- * @returns True if should fall back to original model
- */
-function shouldFreeModerateUseOriginal(
-    tier: TaskTier,
-    toolsDetected: boolean,
-    config: ClawRouteConfig
-): boolean {
-    if (isProEnabled(config)) {
-        return false; // Pro has full routing
-    }
-    if (tier !== TaskTier.MODERATE) {
-        return false;
-    }
-    // Free + MODERATE + tools = use original
-    return toolsDetected;
-}
-
-/**
- * Check if tier should use fallback routing on Free plan.
- * COMPLEX and FRONTIER on Free → fallback to original model.
- *
- * @param tier - The task tier
- * @param config - The config
- * @returns True if should fall back to original
- */
-function shouldFreeTierUseOriginal(tier: TaskTier, config: ClawRouteConfig): boolean {
-    if (isProEnabled(config)) {
-        return false; // Pro has full routing
-    }
-    // Free plan: COMPLEX and FRONTIER fall back to original
-    return tier === TaskTier.COMPLEX || tier === TaskTier.FRONTIER;
-}
 
 /**
  * Make a routing decision based on classification.
@@ -132,28 +68,13 @@ export function routeRequest(
         const tier = classification.tier;
         const tierConfig = config.models[tier];
 
-        // v1.1: Check Free/Pro plan gating
-        const proEnabled = isProEnabled(config);
-
-        // Free plan: COMPLEX and FRONTIER fall back to original
-        if (shouldFreeTierUseOriginal(tier, config)) {
-            routedModel = originalModel;
-            reason = `tier ${tier}: Free plan - complex routing requires Pro`;
-            isPassthrough = true;
-        }
-        // Free plan: MODERATE with tools falls back to original
-        else if (shouldFreeModerateUseOriginal(tier, classification.toolsDetected, config)) {
-            routedModel = originalModel;
-            reason = `tier ${tier}: Free plan - tool-aware routing requires Pro`;
-            isPassthrough = true;
-        }
-        // Normal tier routing (Free HEARTBEAT/SIMPLE or Pro any tier)
-        else if (tierConfig) {
+        // Normal tier routing (Any tier)
+        if (tierConfig) {
             // Try primary model
             const primaryProvider = getProviderForModel(tierConfig.primary);
             if (hasApiKey(config, primaryProvider)) {
                 routedModel = tierConfig.primary;
-                reason = `tier ${tier}: primary model${proEnabled ? '' : ' (Free)'}`;
+                reason = `tier ${tier}: primary model`;
             } else {
                 // Try fallback model
                 const fallbackProvider = getProviderForModel(tierConfig.fallback);
