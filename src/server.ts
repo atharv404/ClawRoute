@@ -16,11 +16,11 @@ import {
 } from './types.js';
 import { createAuthMiddleware } from './auth.js';
 import { classifyRequest, explainClassification } from './classifier.js';
-import { routeRequest, isProEnabled } from './router.js';
+import { routeRequest } from './router.js';
 import { executeRequest, executePassthrough } from './executor.js';
 import { logRouting, recordPayment } from './logger.js';
-import { getStatsResponse, getBillingSummary } from './stats.js';
-import { getRedactedConfig, saveLicenseToFile } from './config.js';
+import { getStatsResponse, getDonationSummary } from './stats.js';
+import { getRedactedConfig } from './config.js';
 import { generateRequestId, nowIso } from './utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -293,15 +293,15 @@ export function createApp(config: ClawRouteConfig): Hono {
         );
     });
 
-    // === Billing Endpoints (v1.1) ===
+    // === Donation & Billing Endpoints (v1.1) ===
 
-    // Get billing summary
+    // Get donation summary
     app.get('/billing/summary', (c) => {
-        const summary = getBillingSummary(config);
+        const summary = getDonationSummary(config);
         return c.json(summary);
     });
 
-    // Acknowledge payment
+    // Acknowledge donation
     app.post('/billing/acknowledge', async (c) => {
         try {
             const body = await c.req.json() as {
@@ -314,17 +314,13 @@ export function createApp(config: ClawRouteConfig): Hono {
                 return c.json({ error: 'Provide amountUsd and method' }, 400);
             }
 
-            // Record payment in database
+            // Record payment in database (as a donation)
             recordPayment(body.amountUsd, body.method, body.note);
 
-            // Update last acknowledge timestamp in license
-            config.license.lastAcknowledge = nowIso();
-            saveLicenseToFile(config.license);
+            console.log(`💰 Donation acknowledged: $${body.amountUsd} via ${body.method}`);
 
-            console.log(`💰 Payment acknowledged: $${body.amountUsd} via ${body.method}`);
-
-            // Return updated billing summary
-            const summary = getBillingSummary(config);
+            // Return updated summary
+            const summary = getDonationSummary(config);
             return c.json({ success: true, ...summary });
         } catch {
             return c.json({ error: 'Invalid JSON body' }, 400);
@@ -334,34 +330,34 @@ export function createApp(config: ClawRouteConfig): Hono {
     // Get payment links
     app.get('/billing/paylinks', (c) => {
         return c.json({
-            stripeUrl: config.billing.stripeCheckoutUrl ?? null,
-            usdcAddress: config.billing.usdcAddress ?? null,
-            buyMeCoffeeUrl: config.billing.buyMeCoffeeUrl ?? null,
-            nowPaymentsEnabled: !!config.billing.nowPaymentsApiKey,
+            stripeUrl: config.donations.stripeCheckoutUrl ?? null,
+            usdcAddress: config.donations.usdcAddress ?? null,
+            buyMeCoffeeUrl: config.donations.buyMeCoffeeUrl ?? null,
+            nowPaymentsEnabled: !!config.donations.nowPaymentsApiKey,
         });
     });
 
-    // Create NOWPayments invoice
+    // Create NOWPayments invoice for donation
     app.post('/billing/nowpayments/invoice', async (c) => {
-        if (!config.billing.nowPaymentsApiKey) {
+        if (!config.donations.nowPaymentsApiKey) {
             return c.json({ error: 'NOWPayments not configured' }, 400);
         }
 
         try {
             const body = await c.req.json() as { amountUsd?: number };
-            const amount = body.amountUsd ?? config.billing.minMonthlyUsd;
+            const amount = body.amountUsd ?? config.donations.minMonthlyUsd;
 
             const response = await fetch('https://api.nowpayments.io/v1/invoice', {
                 method: 'POST',
                 headers: {
-                    'x-api-key': config.billing.nowPaymentsApiKey,
+                    'x-api-key': config.donations.nowPaymentsApiKey,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     price_amount: amount,
                     price_currency: 'usd',
-                    order_id: `clawroute-${Date.now()}`,
-                    order_description: `ClawRoute Pro - $${amount}/mo`,
+                    order_id: `clawroute-donation-${Date.now()}`,
+                    order_description: `ClawRoute Donation - $${amount}`,
                     success_url: `http://${config.proxyHost}:${config.proxyPort}/dashboard?payment=success`,
                     cancel_url: `http://${config.proxyHost}:${config.proxyPort}/dashboard?payment=cancelled`,
                 }),
@@ -374,7 +370,7 @@ export function createApp(config: ClawRouteConfig): Hono {
             }
 
             const invoice = await response.json() as { invoice_url?: string; id?: string };
-            console.log(`🪙 NOWPayments invoice created: ${invoice.id}`);
+            console.log(`🪙 Donation invoice created: ${invoice.id}`);
             return c.json({ success: true, invoiceUrl: invoice.invoice_url, invoiceId: invoice.id });
         } catch (error) {
             console.error('NOWPayments error:', error);
@@ -382,72 +378,9 @@ export function createApp(config: ClawRouteConfig): Hono {
         }
     });
 
-    // === License Endpoints (v1.1) ===
+    // Legacy license endpoints removed via Donationware refactor
 
-    // Enable license
-    app.post('/license/enable', async (c) => {
-        try {
-            const body = await c.req.json() as { token?: string };
 
-            if (!body.token) {
-                return c.json({ error: 'Provide token' }, 400);
-            }
-
-            // Update license state (honorware - no remote validation)
-            config.license = {
-                enabled: true,
-                plan: 'pro',
-                token: body.token,
-                lastAcknowledge: config.license.lastAcknowledge,
-            };
-
-            // Persist to file
-            saveLicenseToFile(config.license);
-
-            console.log('🔓 Pro license enabled');
-            return c.json({
-                success: true,
-                plan: 'pro',
-                enabled: true,
-            });
-        } catch {
-            return c.json({ error: 'Invalid JSON body' }, 400);
-        }
-    });
-
-    // Disable license
-    app.post('/license/disable', (c) => {
-        const graceDays = config.billing.graceDays;
-        const graceUntil = new Date(
-            Date.now() + graceDays * 24 * 60 * 60 * 1000
-        ).toISOString();
-
-        config.license = {
-            enabled: false,
-            plan: 'free',
-            graceUntil,
-        };
-
-        saveLicenseToFile(config.license);
-
-        console.log('🔒 License disabled, grace period started');
-        return c.json({
-            success: true,
-            plan: 'free',
-            enabled: false,
-            graceUntil,
-        });
-    });
-
-    // Get license status
-    app.get('/license/status', (c) => {
-        return c.json({
-            enabled: config.license.enabled,
-            plan: config.license.plan,
-            graceUntil: config.license.graceUntil ?? null,
-            graceActive: isProEnabled(config) && !config.license.enabled,
-        });
-    });
 
     // Catch-all for unknown routes
     app.all('*', (c) => {
