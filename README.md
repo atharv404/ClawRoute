@@ -243,6 +243,12 @@ Contributions welcome! Please read our contributing guidelines first.
 4. Run tests: `npm test`
 5. Submit a pull request
 
+## Support the Project
+
+ClawRoute is 100% free and open-source. **There is no billing for LLM usage** within ClawRoute itself—you pay your providers (OpenAI, Anthropic, etc.) directly.
+
+If you find this tool useful, you can optionally support development. The wallet address in the config (`CLAWROUTE_DONATION_USDC_ADDR`) is **strictly for voluntary donations** and is never used for mandatory billing or routing.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
