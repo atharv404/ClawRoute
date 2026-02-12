@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawRoute Dashboard (Demo)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: rgba(22, 27, 40, 0.7);
+            --bg-tertiary: rgba(33, 38, 52, 0.6);
+            --bg-glass: rgba(16, 20, 32, 0.55);
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-green: #3fb950;
+            --accent-green-dim: #238636;
+            --accent-red: #f85149;
+            --accent-blue: #58a6ff;
+            --accent-yellow: #d29922;
+            --accent-purple: #a371f7;
+            --accent-cyan: #39d2c0;
+            --border-color: rgba(48, 54, 61, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.06);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.55);
+            --gradient-green: linear-gradient(135deg, #3fb950, #2ea043);
+            --gradient-purple: linear-gradient(135deg, #a371f7, #8957e5);
+            --gradient-blue: linear-gradient(135deg, #58a6ff, #388bfd);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.4;
+        }
+
+        /* Animated background gradient */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(63, 185, 80, 0.04) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(88, 166, 255, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(163, 113, 247, 0.03) 0%, transparent 50%);
+            animation: bgShift 20s ease-in-out infinite alternate;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        @keyframes bgShift {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            100% {
+                transform: translate(-5%, -5%) rotate(3deg);
+            }
+        }
+
+        .container {
+            max-width: 1260px;
+            margin: 0 auto;
+            padding: 28px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* === Header === */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 36px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            opacity: 0;
+            animation: fadeSlideDown 0.6s ease forwards;
+        }
+
+        @keyframes fadeSlideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.3px;
+        }
+
+        h1 .logo {
+            font-size: 30px;
+            filter: drop-shadow(0 0 8px rgba(63, 185, 80, 0.3));
+        }
+
+        h1 .version {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: var(--bg-tertiary);
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-left: 4px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 18px;
+            border-radius: 24px;
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.live {
+            background: rgba(35, 134, 54, 0.25);
+            color: var(--accent-green);
+            box-shadow: 0 0 20px rgba(63, 185, 80, 0.15);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .status-dot::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            animation: heartbeat 2s ease-in-out infinite;
+        }
+
+        .status-dot.live {
+            background: var(--accent-green);
+        }
+
+        .status-dot.live::after {
+            border: 2px solid var(--accent-green);
+        }
+
+        @keyframes heartbeat {
+
+            0%,
+            100% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(1.6);
+            }
+        }
+
+        /* === Cards === */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
+        }
+
+        .card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+            opacity: 0;
+            transform: translateY(20px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-hover);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card.animate-visible {
+            animation: cardEntrance 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes cardEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(24px) scale(0.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .card-label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .info-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid var(--text-muted);
+            color: var(--text-muted);
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: help;
+        }
+
+        .card-value {
+            font-size: 34px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+
+        .card-value.savings {
+            background: var(--gradient-green);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card-value.neutral {
+            color: var(--text-primary);
+        }
+
+        .card-sub {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        .card.has-savings {
+            box-shadow: var(--shadow), 0 0 30px rgba(63, 185, 80, 0.08);
+        }
+
+        .card.has-savings::before {
+            opacity: 0.6;
+        }
+
+        /* === Sections === */
+        .section {
+            background: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .section.animate-visible {
+            animation: sectionEntrance 0.6s ease forwards;
+        }
+
+        @keyframes sectionEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .section-title {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* === Tier Breakdown === */
+        .tier-breakdown {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .tier-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        .tier-row.animate-visible {
+            animation: tierSlideIn 0.4s ease forwards;
+        }
+
+        @keyframes tierSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .tier-name {
+            width: 90px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .tier-bar {
+            flex: 1;
+            height: 28px;
+            background: rgba(33, 38, 52, 0.5);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tier-fill {
+            height: 100%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            width: 0;
+            transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .tier-fill.heartbeat {
+            background: linear-gradient(90deg, #3fb950, #2ea043);
+        }
+
+        .tier-fill.simple {
+            background: linear-gradient(90deg, #58a6ff, #388bfd);
+        }
+
+        .tier-fill.moderate {
+            background: linear-gradient(90deg, #a371f7, #8957e5);
+        }
+
+        .tier-fill.complex {
+            background: linear-gradient(90deg, #d29922, #b08700);
+        }
+
+        .tier-fill.frontier {
+            background: linear-gradient(90deg, #f85149, #da3633);
+        }
+
+        .tier-model {
+            width: 160px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: right;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        /* === Table === */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.heartbeat {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .badge.simple {
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .badge.moderate {
+            background: rgba(163, 113, 247, 0.15);
+            color: var(--accent-purple);
+        }
+
+        .badge.complex {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .badge.frontier {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+        }
+
+        .badge.escalated {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+        }
+
+        /* === Billing Card === */
+        .billing-card {
+            border-color: rgba(163, 113, 247, 0.2);
+        }
+
+        .billing-card::before {
+            background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+        }
+
+        .plan-badge {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .plan-badge.pro {
+            background: rgba(163, 113, 247, 0.2);
+            color: var(--accent-purple);
+            box-shadow: 0 0 12px rgba(163, 113, 247, 0.1);
+        }
+
+        .plan-badge.free {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+            padding: 20px 0 8px;
+            border-top: 1px solid var(--border-color);
+            opacity: 0;
+            animation: fadeSlideDown 0.6s ease 1s forwards;
+        }
+
+        .footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div class="container">
+        <header>
+            <h1>
+                <span class="logo">🦀</span>
+                ClawRoute
+                <span class="version">v1.1</span>
+            </h1>
+            <div class="status-badge live" id="statusBadge">
+                <span class="status-dot live"></span>
+                <span id="statusText">Live</span>
+            </div>
+        </header>
+
+        <div class="cards">
+            <!-- Saved Today -->
+            <div class="card" id="cardSavings">
+                <div class="card-header">
+                    <span class="card-label">Saved Today</span>
+                    <div class="info-icon">ⓘ</div>
+                </div>
+                <div class="card-value savings" id="savedToday">$0.00</div>
+                <div class="card-sub"><span id="savingsPercent">0</span>% savings rate</div>
+            </div>
+
+            <!-- Requests Today -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-label">Requests Today</span>
+                    <div class="info-icon">ⓘ</div>
+                </div>
+                <div class="card-value neutral" id="requestsToday">0</div>
+                <div class="card-sub"><span id="escalations">0</span> escalations</div>
+            </div>
+
+            <!-- Monthly Savings -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-label">Monthly Savings</span>
+                    <div class="info-icon">ⓘ</div>
+                </div>
+                <div class="card-value savings" id="savedMonth">$0.00</div>
+                <div class="card-sub"><span id="requestsMonth">0</span> requests this month</div>
+            </div>
+
+            <!-- Plan & Billing -->
+            <div class="card billing-card">
+                <div class="card-header">
+                    <span class="card-label">Plan & Billing</span>
+                    <div class="info-icon">ⓘ</div>
+                </div>
+                <div class="card-value" id="planStatusValue">
+                    <span class="plan-badge free" id="planBadge">Free</span>
+                </div>
+                <div class="card-sub" id="billingSub">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Tier Breakdown -->
+        <div class="section" id="sectionTiers">
+            <div class="section-header">
+                <div class="section-title">📊 Tier Breakdown (Today)</div>
+            </div>
+            <div class="tier-breakdown" id="tierBreakdown"></div>
+        </div>
+
+        <!-- Recent Decisions -->
+        <div class="section" id="sectionRecent">
+            <div class="section-header">
+                <div class="section-title">📋 Recent Routing Decisions</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Tier</th>
+                        <th>Routed To</th>
+                        <th>Saved</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="recentDecisions"></tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            ClawRoute v1.1 — Built with ❤️ by <a href="https://github.com/atharv404" target="_blank">atharv404</a>
+        </div>
+    </div>
+
+    <script>
+        const tiers = ['heartbeat', 'simple', 'moderate', 'complex', 'frontier'];
+
+        function animateNumber(el, target, prefix = '', suffix = '', decimals = 0) {
+            const start = parseFloat(el.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+            const duration = 600;
+            const startTime = performance.now();
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = start + (target - start) * eased;
+                el.textContent = prefix + current.toFixed(decimals) + suffix;
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        function animateOnView() {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, i) => setTimeout(() => card.classList.add('animate-visible'), i * 100));
+            const sections = document.querySelectorAll('.section');
+            sections.forEach((section, i) => setTimeout(() => section.classList.add('animate-visible'), 400 + i * 150));
+        }
+
+        // === Fake Data Injection ===
+        function loadDemoData() {
+            console.log("Loading demo data...");
+
+            const demoStats = {
+                config: {
+                    enabled: true, dryRun: false, modelMap: {
+                        heartbeat: 'google/gemini-2.5-flash-lite',
+                        simple: 'deepseek/deepseek-chat',
+                        moderate: 'google/gemini-2.5-flash',
+                        complex: 'anthropic/claude-sonnet-4-5',
+                        frontier: 'anthropic/claude-sonnet-4-5'
+                    }
+                },
+                today: {
+                    savingsUsd: 14.50,
+                    savingsPercent: 32.5,
+                    requests: 840,
+                    escalations: 12,
+                    tierBreakdown: { heartbeat: 400, simple: 300, moderate: 100, complex: 35, frontier: 5 }
+                },
+                thisMonth: {
+                    savingsUsd: 452.80,
+                    requests: 15420
+                },
+                recentDecisions: []
+            };
+
+            // FAKE DECISIONS
+            const models = ['google/gemini-2.5-flash-lite', 'deepseek/deepseek-chat', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4-5'];
+            const decisions = [
+                { tier: 'heartbeat', routed: 'google/gemini-2.5-flash-lite', saved: 0.002, esc: false },
+                { tier: 'simple', routed: 'deepseek/deepseek-chat', saved: 0.015, esc: false },
+                { tier: 'moderate', routed: 'google/gemini-2.5-flash', saved: 0.040, esc: false },
+                { tier: 'complex', routed: 'anthropic/claude-sonnet-4-5', saved: 0.250, esc: false },
+                { tier: 'simple', routed: 'deepseek/deepseek-chat', saved: 0.012, esc: false },
+                { tier: 'heartbeat', routed: 'google/gemini-2.5-flash-lite', saved: 0.001, esc: false },
+                { tier: 'frontier', routed: 'anthropic/claude-sonnet-4-5', saved: 0.850, esc: true },
+                { tier: 'simple', routed: 'deepseek/deepseek-chat', saved: 0.008, esc: false },
+                { tier: 'moderate', routed: 'google/gemini-2.5-flash', saved: 0.035, esc: false },
+                { tier: 'complex', routed: 'anthropic/claude-sonnet-4-5', saved: 0.180, esc: false },
+            ];
+
+            decisions.forEach((d, i) => {
+                demoStats.recentDecisions.push({
+                    timestamp: new Date(Date.now() - i * 1000 * 45).toISOString(),
+                    tier: d.tier,
+                    routedModel: d.routed,
+                    savingsUsd: d.saved,
+                    escalated: d.esc
+                });
+            });
+
+            updateDashboard(demoStats);
+
+            const demoBilling = {
+                plan: 'free',
+                graceActive: false,
+                suggestedUsd: 9.00,
+                proRatePercent: 0.02,
+                requests: 15420
+            };
+            updateBillingPanel(demoBilling);
+        }
+
+        function updateDashboard(data) {
+            animateNumber(document.getElementById('savedToday'), data.today.savingsUsd, '$', '', 2);
+            animateNumber(document.getElementById('savingsPercent'), data.today.savingsPercent, '', '', 1);
+            animateNumber(document.getElementById('requestsToday'), data.today.requests, '', '', 0);
+            animateNumber(document.getElementById('escalations'), data.today.escalations, '', '', 0);
+            animateNumber(document.getElementById('savedMonth'), data.thisMonth.savingsUsd, '$', '', 2);
+            animateNumber(document.getElementById('requestsMonth'), data.thisMonth.requests, '', '', 0);
+
+            const savingsCard = document.getElementById('cardSavings');
+            if (data.today.savingsUsd > 0) savingsCard.classList.add('has-savings');
+            else savingsCard.classList.remove('has-savings');
+
+            const tierContainer = document.getElementById('tierBreakdown');
+            tierContainer.innerHTML = '';
+            const maxCount = Math.max(...tiers.map(t => data.today.tierBreakdown[t] || 0), 1);
+
+            tiers.forEach((tier, i) => {
+                const count = data.today.tierBreakdown[tier] || 0;
+                const pct = (count / maxCount) * 100;
+                const model = data.config.modelMap[tier] || 'unknown';
+                const shortModel = model.split('/').pop();
+
+                const row = document.createElement('div');
+                row.className = 'tier-row';
+                row.innerHTML = `
+          <span class="tier-name">${tier.charAt(0).toUpperCase() + tier.slice(1)}</span>
+          <div class="tier-bar">
+            <div class="tier-fill ${tier}" id="tierFill-${tier}">
+              ${count > 0 ? count : ''}
+            </div>
+          </div>
+          <span class="tier-model">→ ${shortModel}</span>
+        `;
+                tierContainer.appendChild(row);
+
+                setTimeout(() => {
+                    row.classList.add('animate-visible');
+                    const fill = document.getElementById(`tierFill-${tier}`);
+                    if (fill) fill.style.width = `${Math.max(pct, count > 0 ? 12 : 0)}%`;
+                }, i * 80);
+            });
+
+            const tbody = document.getElementById('recentDecisions');
+            tbody.innerHTML = '';
+            data.recentDecisions.forEach((decision, i) => {
+                const time = new Date(decision.timestamp).toLocaleTimeString().slice(0, 5);
+                const model = decision.routedModel.split('/').pop();
+                const saved = '$' + decision.savingsUsd.toFixed(3);
+                const status = decision.escalated ? '<span class="badge escalated">↑ Escalated</span>' : '<span style="color: var(--accent-green)">✓</span>';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+          <td>${time}</td>
+          <td><span class="badge ${decision.tier}">${decision.tier}</span></td>
+          <td style="font-family: 'SF Mono', monospace; font-size: 12px;">${model}</td>
+          <td style="color: var(--accent-green); font-weight: 500;">${saved}</td>
+          <td>${status}</td>
+        `;
+                tbody.appendChild(tr);
+                setTimeout(() => tr.classList.add('animate-visible'), i * 40);
+            });
+        }
+
+        function updateBillingPanel(data) {
+            const planBadge = document.getElementById('planBadge');
+            const billingSub = document.getElementById('billingSub');
+
+            planBadge.className = 'plan-badge ' + data.plan;
+            planBadge.textContent = 'Community'; // Updated label
+
+            // Force the suggested message to show
+            billingSub.textContent = `Suggested: $${data.suggestedUsd.toFixed(2)}/mo (${(data.proRatePercent * 100).toFixed(0)}% of savings)`;
+        }
+
+        // === Three.js Background Animation ===
+        function initThreeJs() {
+            const canvas = document.getElementById('bg-canvas');
+            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 30;
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 400;
+            const posArray = new Float32Array(particlesCount * 3);
+            for (let i = 0; i < particlesCount * 3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 80;
+            }
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const material = new THREE.PointsMaterial({
+                size: 0.2, color: 0x6366f1, transparent: true, opacity: 0.8,
+            });
+            const particlesMesh = new THREE.Points(particlesGeometry, material);
+            scene.add(particlesMesh);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x6366f1, transparent: true, opacity: 0.15 });
+            const linesGeometry = new THREE.BufferGeometry();
+            const linesMesh = new THREE.LineSegments(linesGeometry, lineMaterial);
+            scene.add(linesMesh);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                particlesMesh.rotation.y += 0.0005;
+                particlesMesh.rotation.x += 0.0002;
+                renderer.render(scene, camera);
+            }
+            animate();
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // Initialize
+        initThreeJs();
+        animateOnView();
+        loadDemoData();
+    </script>
+</body>
+
+</html>

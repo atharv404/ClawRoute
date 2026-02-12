@@ -4,7 +4,7 @@
 
 Save 60-90% on your OpenClaw LLM costs by automatically routing requests to cheaper models when appropriate.
 
-> **v1.1** — Now with Free/Pro tiers, billing dashboard, and license management.
+> **v1.1** — Intelligent, local, and private.
 >
 > Works with **any OpenAI-compatible client** — OpenClaw, Cursor, custom apps, or direct API calls. No special detection needed.
 
@@ -44,30 +44,6 @@ npm start
 #   providers.openai.baseUrl → "http://127.0.0.1:18790/v1"
 ```
 
-## Pricing
-
-ClawRoute is open-source (MIT). Pro features are available via an honorware license.
-
-| Feature | Free | Pro ($9+/mo) |
-|---------|------|-------------|
-| HEARTBEAT/SIMPLE routing | ✅ | ✅ |
-| MODERATE routing | ⚠️ Limited | ✅ Full |
-| COMPLEX/FRONTIER routing | ❌ Original model | ✅ Full |
-| Escalation | HEARTBEAT→SIMPLE only | ✅ All tiers |
-| Dashboard | Basic stats | ✅ + Billing |
-| Analytics & export | ❌ | ✅ |
-| Custom model mappings | ❌ | ✅ |
-| 7-day trial | ✅ All features | — |
-
-Pro pricing is savings-based: **2% of your monthly savings** (minimum $9/mo). If ClawRoute saves you $500/mo, suggested payment is $10/mo.
-
-```bash
-# Enable Pro with a license token
-clawroute license --enable YOUR_TOKEN
-
-# Check billing summary
-clawroute billing
-```
 
 ## Configuration
 
@@ -85,8 +61,6 @@ clawroute billing
 | `CLAWROUTE_DRY_RUN` | `false` | Classify but don't reroute |
 | `CLAWROUTE_DEBUG` | `false` | Verbose logging |
 
-| `CLAWROUTE_PRO_RATE` | `0.02` | Suggested payment rate (% of savings) |
-| `CLAWROUTE_PRO_MIN_MONTHLY` | `9` | Minimum monthly payment (USD) |
 
 ### Model Mappings
 
@@ -142,9 +116,6 @@ clawroute dry-run            # Enable dry-run mode
 clawroute live               # Disable dry-run (go live)
 clawroute log                # Show recent routing decisions
 clawroute config             # Show current config
-clawroute billing            # Show billing summary
-clawroute license --enable TOKEN  # Enable Pro license
-clawroute license --disable  # Disable Pro (starts grace period)
 ```
 
 ## How Classification Works
@@ -233,16 +204,6 @@ POST /api/override/global  # Set global model override
 POST /api/override/session # Set session override
 ```
 
-### Billing & License Endpoints (v1.1)
-
-```
-GET  /billing/summary      # Monthly billing summary
-POST /billing/acknowledge  # Record a payment
-GET  /billing/paylinks     # Get payment links
-POST /license/enable       # Enable Pro license
-POST /license/disable      # Disable Pro (grace period)
-GET  /license/status       # Current license status
-```
 
 ## FAQ
 
