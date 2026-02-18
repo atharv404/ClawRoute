@@ -127,15 +127,15 @@ const DEFAULT_TIER_MODELS: Record<TaskTier, TierModelConfig> = {
     },
     [TaskTier.MODERATE]: {
         primary: 'google/gemini-2.5-flash',
-        fallback: 'openai/gpt-4o-mini',
+        fallback: 'openai/gpt-5-mini',
     },
     [TaskTier.COMPLEX]: {
-        primary: 'anthropic/claude-sonnet-4-5',
-        fallback: 'openai/gpt-4o',
+        primary: 'anthropic/claude-sonnet-4-6',
+        fallback: 'openai/gpt-5.2',
     },
     [TaskTier.FRONTIER]: {
-        primary: 'anthropic/claude-sonnet-4-5',
-        fallback: 'openai/gpt-4o',
+        primary: 'anthropic/claude-opus-4-6',
+        fallback: 'openai/o3',
     },
 };
 

@@ -2,9 +2,9 @@
 
 **Intelligent cost-optimizing model router for OpenClaw**
 
-Save 60-90% on your OpenClaw LLM costs by automatically routing requests to cheaper models when appropriate.
+Save 60-90% on your LLM costs by automatically routing requests to cheaper models when appropriate.
 
-> **v1.1** — Intelligent, local, and private.
+> **v1.2** — Intelligent, local, and private. Updated for the latest models (Feb 2026).
 >
 > Works with **any OpenAI-compatible client** — OpenClaw, Cursor, custom apps, or direct API calls. No special detection needed.
 
@@ -13,7 +13,7 @@ Save 60-90% on your OpenClaw LLM costs by automatically routing requests to chea
 ClawRoute is a local HTTP proxy that sits between OpenClaw and your LLM providers. It:
 
 1. **Intercepts** every LLM request from OpenClaw
-2. **Classifies** the task complexity using local heuristics (no API calls)
+2. **Classifies** the task complexity using local heuristics (no API calls, <5ms)
 3. **Routes** to the cheapest model that can handle it
 4. **Escalates** automatically if the cheap model fails (before streaming)
 
@@ -29,11 +29,13 @@ OpenClaw → ClawRoute (127.0.0.1:18790) → OpenAI/Anthropic/Google/DeepSeek
 
 ```bash
 # Clone and install
-git clone https://github.com/user/clawroute && cd clawroute
+git clone https://github.com/atharv404/ClawRoute && cd ClawRoute
 npm install && npm run build
 
 # Configure API keys
 echo 'OPENAI_API_KEY=sk-xxx' >> .env
+echo 'ANTHROPIC_API_KEY=sk-ant-xxx' >> .env
+echo 'GOOGLE_API_KEY=AIzaXXX' >> .env
 echo 'DEEPSEEK_API_KEY=sk-xxx' >> .env
 
 # Start the proxy
@@ -64,15 +66,15 @@ npm start
 
 ### Model Mappings
 
-Default tier → model mappings:
+Default tier → model mappings (as of Feb 2026):
 
-| Tier | Primary Model | Use Case |
-|------|--------------|----------|
-| Heartbeat | `gemini-2.5-flash-lite` | Ping/status checks |
-| Simple | `deepseek-chat` | Acknowledgments, short replies |
-| Moderate | `gemini-2.5-flash` | General conversation |
-| Complex | `claude-sonnet-4.5` | Tool use, analysis |
-| Frontier | `claude-sonnet-4.5` | Code, reasoning |
+| Tier | Primary Model | Fallback | Use Case |
+|------|--------------|----------|----------|
+| Heartbeat | `gemini-2.5-flash-lite` | `deepseek-chat` | Ping/status checks |
+| Simple | `deepseek-chat` | `gemini-2.5-flash` | Acknowledgments, short replies |
+| Moderate | `gemini-2.5-flash` | `gpt-5-mini` | General conversation |
+| Complex | `claude-sonnet-4-6` | `gpt-5.2` | Tool use, analysis |
+| Frontier | `claude-opus-4-6` | `o3` | Code, deep reasoning |
 
 Customize in `config/clawroute.json`.
 
@@ -120,33 +122,33 @@ clawroute config             # Show current config
 
 ## How Classification Works
 
-ClawRoute uses heuristic rules evaluated in priority order:
+ClawRoute uses heuristic rules evaluated in priority order (<5ms, fully local):
 
 ### Tier 0: Heartbeat
 - Matches: "ping", "hi", "status", "test"
 - Short messages (< 30 chars) with no tools
-- Routes to: `gemini-2.5-flash-lite` ($0.075/M tokens)
+- Routes to: `gemini-2.5-flash-lite` ($0.10/M input)
 
 ### Tier 1: Simple
 - Acknowledgments: "thanks", "ok", "👍"
 - Short questions (< 80 chars)
-- Routes to: `deepseek-chat` ($0.14/M tokens)
+- Routes to: `deepseek-chat` ($0.28/M input)
 
 ### Tier 2: Moderate (default)
 - General conversation
-- Routes to: `gemini-2.5-flash` ($0.15/M tokens)
+- Routes to: `gemini-2.5-flash` ($0.30/M input)
 
 ### Tier 3: Complex
 - Tool/function calls present
 - Analytical keywords + length
 - Deep conversations (> 8 messages)
-- Routes to: `claude-sonnet-4.5` ($3/M tokens)
+- Routes to: `claude-sonnet-4-6` ($3.00/M input)
 
 ### Tier 4: Frontier
 - Code blocks detected
 - Tool calls with `tool_choice` set
 - Very long context (> 8K tokens)
-- Routes to: original model (no downgrade)
+- Routes to: `claude-opus-4-6` ($15/M input) or original model
 
 ## Safety Guarantees
 
@@ -166,20 +168,19 @@ ClawRoute uses heuristic rules evaluated in priority order:
 
 ## Supported Providers
 
-| Provider | Status | Notes |
-|----------|--------|-------|
-| OpenAI | ✅ Full | GPT-4, GPT-4o, o1 |
-| DeepSeek | ✅ Full | DeepSeek Chat |
-| Google | ✅ Full | Gemini models (OpenAI-compatible) |
-| Anthropic | ⚠️ OpenRouter | Use OpenRouter for Claude models |
+| Provider | Status | Models |
+|----------|--------|--------|
+| OpenAI | ✅ Full | GPT-5 Mini, GPT-5.2, o3 |
+| Anthropic | ✅ Full | Claude Sonnet 4.6, Claude Opus 4.6 |
+| Google | ✅ Full | Gemini 2.5 Flash Lite, Flash, Pro |
+| DeepSeek | ✅ Full | DeepSeek V3.2 (via `deepseek-chat`) |
 | OpenRouter | ✅ Full | Any model via OpenRouter |
 
 ## Known Limitations
 
-1. **OpenAI-compatible format only** (v1.0): Native Anthropic format coming in v1.1
-2. **Heuristic classification**: Rules-based, not ML. May occasionally misclassify.
-3. **Token estimates for streaming**: Estimated from chunk count, not exact.
-4. **Cost data**: Based on published prices, may lag behind provider changes.
+1. **Heuristic classification**: Rules-based, not ML. May occasionally misclassify edge cases.
+2. **Token estimates for streaming**: Estimated from chunk count, not exact.
+3. **Cost data**: Based on published prices as of Feb 2026, may lag behind provider changes.
 
 ## API Reference
 
@@ -207,9 +208,9 @@ POST /api/override/session # Set session override
 
 ## FAQ
 
-### Can I use this with Anthropic Claude?
+### Can I use this with Anthropic Claude directly?
 
-Yes! Use OpenRouter as your provider, which gives you an OpenAI-compatible interface to Claude models. Set `OPENROUTER_API_KEY` in your `.env`.
+Yes! ClawRoute supports Anthropic's API natively. Set `ANTHROPIC_API_KEY` in your `.env` and it will route to Claude models directly. You can also use OpenRouter for additional flexibility.
 
 ### Will this break my agent?
 
@@ -232,6 +233,28 @@ Yes. ClawRoute is 100% local:
 - No content logging by default
 - No telemetry or external connections
 - All data stays on your machine
+
+## ClawRoute vs OpenRouter
+
+Both solve the "too many LLM providers" problem, but in completely different ways.
+
+| | ClawRoute | OpenRouter |
+|---|---|---|
+| **Where it runs** | 100% local on your machine | Their cloud servers |
+| **Data privacy** | ✅ Prompts never leave your machine | ❌ Routed through OpenRouter's servers |
+| **Cost overhead** | Free — pay providers directly | +5.5% platform fee on every request |
+| **Smart routing** | ✅ Automatic by complexity (<5ms) | ❌ You pick the model manually |
+| **Savings** | 60-90% automatic on simple requests | Only if you manually choose cheaper models |
+| **Setup** | Local install + your own API keys | One API key, zero setup |
+| **Model access** | Your own keys (5 providers) | 300+ models via one unified key |
+| **Works offline** | ✅ Classification is local | ❌ Requires internet |
+| **Vendor lock-in** | None — direct provider APIs | Tied to OpenRouter's availability |
+
+**Choose ClawRoute if**: You want automatic cost savings, full privacy, and no middleman fees. You already have API keys.
+
+**Choose OpenRouter if**: You want access to 300+ models with a single key and don't want to manage multiple API accounts.
+
+**Best of both worlds**: Use ClawRoute with `OPENROUTER_API_KEY` — you get ClawRoute's automatic smart routing *and* OpenRouter's model breadth.
 
 ## Contributing
 

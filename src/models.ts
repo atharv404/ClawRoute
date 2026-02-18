@@ -9,15 +9,15 @@ import { ModelEntry, ProviderType } from './types.js';
 
 /**
  * Default models with their costs and capabilities.
- * Costs are in USD per 1M tokens (as of early 2024).
+ * Costs are in USD per 1M tokens (as of February 2026).
  */
 export const DEFAULT_MODELS: ModelEntry[] = [
     // Ultra-cheap tier (heartbeat/simple)
     {
         id: 'google/gemini-2.5-flash-lite',
         provider: 'google',
-        inputCostPer1M: 0.075,
-        outputCostPer1M: 0.30,
+        inputCostPer1M: 0.10,
+        outputCostPer1M: 0.40,
         maxContext: 1000000,
         toolCapable: false,
         multimodal: false,
@@ -26,8 +26,8 @@ export const DEFAULT_MODELS: ModelEntry[] = [
     {
         id: 'deepseek/deepseek-chat',
         provider: 'deepseek',
-        inputCostPer1M: 0.14,
-        outputCostPer1M: 0.28,
+        inputCostPer1M: 0.28,
+        outputCostPer1M: 1.12,
         maxContext: 64000,
         toolCapable: true,
         multimodal: false,
@@ -38,18 +38,18 @@ export const DEFAULT_MODELS: ModelEntry[] = [
     {
         id: 'google/gemini-2.5-flash',
         provider: 'google',
-        inputCostPer1M: 0.15,
-        outputCostPer1M: 0.60,
+        inputCostPer1M: 0.30,
+        outputCostPer1M: 2.50,
         maxContext: 1000000,
         toolCapable: true,
         multimodal: true,
         enabled: true,
     },
     {
-        id: 'openai/gpt-4o-mini',
+        id: 'openai/gpt-5-mini',
         provider: 'openai',
-        inputCostPer1M: 0.15,
-        outputCostPer1M: 0.60,
+        inputCostPer1M: 0.25,
+        outputCostPer1M: 2.00,
         maxContext: 128000,
         toolCapable: true,
         multimodal: true,
@@ -58,7 +58,7 @@ export const DEFAULT_MODELS: ModelEntry[] = [
 
     // High-tier (complex)
     {
-        id: 'anthropic/claude-sonnet-4-5',
+        id: 'anthropic/claude-sonnet-4-6',
         provider: 'anthropic',
         inputCostPer1M: 3.00,
         outputCostPer1M: 15.00,
@@ -68,10 +68,20 @@ export const DEFAULT_MODELS: ModelEntry[] = [
         enabled: true,
     },
     {
-        id: 'openai/gpt-4o',
-        provider: 'openai',
-        inputCostPer1M: 2.50,
+        id: 'google/gemini-2.5-pro',
+        provider: 'google',
+        inputCostPer1M: 1.25,
         outputCostPer1M: 10.00,
+        maxContext: 1000000,
+        toolCapable: true,
+        multimodal: true,
+        enabled: true,
+    },
+    {
+        id: 'openai/gpt-5.2',
+        provider: 'openai',
+        inputCostPer1M: 1.75,
+        outputCostPer1M: 14.00,
         maxContext: 128000,
         toolCapable: true,
         multimodal: true,
@@ -80,17 +90,17 @@ export const DEFAULT_MODELS: ModelEntry[] = [
 
     // Frontier tier
     {
-        id: 'openai/o1',
+        id: 'openai/o3',
         provider: 'openai',
-        inputCostPer1M: 15.00,
-        outputCostPer1M: 60.00,
+        inputCostPer1M: 2.00,
+        outputCostPer1M: 8.00,
         maxContext: 200000,
         toolCapable: true,
         multimodal: true,
         enabled: true,
     },
     {
-        id: 'anthropic/claude-opus-4',
+        id: 'anthropic/claude-opus-4-6',
         provider: 'anthropic',
         inputCostPer1M: 15.00,
         outputCostPer1M: 75.00,
@@ -144,7 +154,7 @@ export function getModelEntry(modelId: string): ModelEntry | null {
 /**
  * Extract the provider from a model ID.
  *
- * @param modelId - The model ID (e.g., "anthropic/claude-sonnet-4-5")
+ * @param modelId - The model ID (e.g., "anthropic/claude-sonnet-4-6")
  * @returns The provider type
  */
 export function getProviderForModel(modelId: string): ProviderType {
@@ -163,7 +173,7 @@ export function getProviderForModel(modelId: string): ProviderType {
     // Default heuristics based on model name
     const lowerModelId = modelId.toLowerCase();
     if (lowerModelId.includes('claude')) return 'anthropic';
-    if (lowerModelId.includes('gpt') || lowerModelId.includes('o1')) return 'openai';
+    if (lowerModelId.includes('gpt') || lowerModelId.includes('o3') || lowerModelId.includes('o1')) return 'openai';
     if (lowerModelId.includes('gemini')) return 'google';
     if (lowerModelId.includes('deepseek')) return 'deepseek';
 
@@ -187,9 +197,9 @@ export function calculateCost(
     const entry = getModelEntry(modelId);
 
     if (!entry) {
-        // Unknown model - use a conservative estimate (GPT-4o pricing)
-        const defaultInputCost = 2.50;
-        const defaultOutputCost = 10.00;
+        // Unknown model - use a conservative estimate (GPT-5.2 pricing)
+        const defaultInputCost = 1.75;
+        const defaultOutputCost = 14.00;
         return (inputTokens / 1_000_000) * defaultInputCost + (outputTokens / 1_000_000) * defaultOutputCost;
     }
 
