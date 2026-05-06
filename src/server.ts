@@ -9,6 +9,7 @@ import { cors } from 'hono/cors';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import {
     ChatCompletionRequest,
     ClawRouteConfig,
@@ -22,9 +23,14 @@ import { logRouting, recordPayment } from './logger.js';
 import { getStatsResponse, getDonationSummary } from './stats.js';
 import { getRedactedConfig } from './config.js';
 import { generateRequestId, nowIso } from './utils.js';
+import { getAllModels } from './models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Read version from package.json at startup
+const _require = createRequire(import.meta.url);
+const PKG_VERSION: string = (_require('../package.json') as { version: string }).version ?? '1.2.0';
 
 /**
  * Create the Hono application.
@@ -46,10 +52,51 @@ export function createApp(config: ClawRouteConfig): Hono {
     app.get('/health', (c) => {
         return c.json({
             status: 'ok',
-            version: '1.1.0',
+            version: PKG_VERSION,
             enabled: config.enabled,
             dryRun: config.dryRun,
             timestamp: nowIso(),
+        });
+    });
+
+    // OpenAI-compatible model list — required by OpenClaw, Cursor, Continue.dev etc.
+    // to verify the provider during configuration.
+    app.get('/v1/models', (c) => {
+        const now = Math.floor(Date.now() / 1000);
+        const registeredModels = getAllModels();
+
+        // Collect the unique models actively used in tier config
+        const tierModelIds = new Set<string>();
+        for (const tierCfg of Object.values(config.models)) {
+            if (tierCfg.primary)  tierModelIds.add(tierCfg.primary);
+            if (tierCfg.fallback) tierModelIds.add(tierCfg.fallback);
+        }
+
+        // Build the OpenAI-spec model list from the registry + active tier models
+        const allIds = new Set([
+            ...registeredModels.map((m) => m.id),
+            ...tierModelIds,
+        ]);
+
+        const data = Array.from(allIds).map((id) => ({
+            id,
+            object: 'model',
+            created: now,
+            owned_by: id.includes('/') ? id.split('/')[0] : 'clawroute',
+        }));
+
+        return c.json({ object: 'list', data });
+    });
+
+    // Single model lookup — some clients call GET /v1/models/:model
+    app.get('/v1/models/:model', (c) => {
+        const modelId = c.req.param('model');
+        const now = Math.floor(Date.now() / 1000);
+        return c.json({
+            id: modelId,
+            object: 'model',
+            created: now,
+            owned_by: modelId.includes('/') ? modelId.split('/')[0] : 'clawroute',
         });
     });
 
